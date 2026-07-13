@@ -155,7 +155,7 @@ world because Foundry globals are unavailable to Node tests.
    errors. A different logged-in Foundry user should remain inactive.
 3. On the website, use a character-owned technique whose selected SP tier has
    one damage action (`2d8 + 4`, `necrotic`) and one healing action (`1d6`).
-4. Make a successful Spirit Die roll for that technique and exact SP tier.
+4. Make a Spirit Die roll for that technique and exact SP tier; either a success or failure triggers its actions.
 5. Confirm Foundry chat shows the existing Spirit Die card followed by two
    separate native roll messages authored by the selected bridge user.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
