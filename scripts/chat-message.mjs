@@ -3,6 +3,7 @@ import {
   ROLL_TEMPLATE,
   WEBSITE_ORIGIN,
 } from "./constants.mjs";
+import { parseSafeRollFormula } from "./protocol.mjs";
 
 function localize(key, data) {
   return data ? game.i18n.format(key, data) : game.i18n.localize(key);
@@ -61,16 +62,53 @@ export function chatMessageIdForEvent(eventId) {
   return eventId.replaceAll("-", "").slice(0, 16);
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function titleCase(value) {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+export function buildActionFlavor(event) {
+  const isDamage = event.action.kind === "roll_damage";
+  const actionLabel =
+    event.action.label ??
+    localize(
+      isDamage
+        ? "SPIRITUAL_ARTS.Chat.DamageRoll"
+        : "SPIRITUAL_ARTS.Chat.HealingRoll",
+    );
+  const rollType = isDamage
+    ? localize("SPIRITUAL_ARTS.Chat.DamageType", {
+        type: titleCase(event.action.damageType),
+      })
+    : localize("SPIRITUAL_ARTS.Chat.Healing");
+
+  return [
+    '<div class="spiritual-arts-action-flavor">',
+    `<strong>${escapeHtml(actionLabel)}</strong>`,
+    `<span>${escapeHtml(event.character.name)} &middot; ${escapeHtml(event.technique.name)}</span>`,
+    `<span>${escapeHtml(rollType)}</span>`,
+    "</div>",
+  ].join("");
+}
+
 export async function createRollChatMessage(event) {
   const content = await renderTemplate(
     ROLL_TEMPLATE,
     buildRollMessageContext(event),
   );
 
-  return ChatMessage.create(
+  const created = await ChatMessage.create(
     {
       _id: chatMessageIdForEvent(event.eventId),
-      user: game.user.id,
+      author: game.user.id,
       speaker: { alias: game.user.name },
       flavor: localize("SPIRITUAL_ARTS.Chat.Source"),
       content,
@@ -83,4 +121,64 @@ export async function createRollChatMessage(event) {
     },
     { keepId: true },
   );
+  if (!created) throw new Error("Foundry did not create the Spirit Die message");
+  return created;
+}
+
+/**
+ * Execute one independently validated website request through Foundry Core.
+ * The narrow grammar check is repeated here at the execution boundary, followed
+ * by Foundry's own Roll validator before any Roll instance is constructed.
+ */
+export async function createActionRollChatMessage(event) {
+  const formula = parseSafeRollFormula(event.action.formula);
+  if (formula === null || !Roll.validate(formula)) {
+    throw new Error("Rejected invalid Foundry action roll formula");
+  }
+
+  const roll = new Roll(formula, {});
+  const evaluated = await roll.evaluate({ allowInteractive: false });
+  const flavor = buildActionFlavor(event);
+  const prepared = await evaluated.toMessage(
+    {
+      author: game.user.id,
+      speaker: { alias: game.user.name },
+      flavor,
+    },
+    { create: false },
+  );
+
+  if (
+    prepared === null ||
+    typeof prepared !== "object" ||
+    Array.isArray(prepared)
+  ) {
+    throw new Error("Foundry did not prepare native roll message data");
+  }
+
+  const created = await ChatMessage.create(
+    {
+      ...prepared,
+      _id: chatMessageIdForEvent(event.eventId),
+      author: game.user.id,
+      speaker: { alias: game.user.name },
+      flavor,
+      flags: {
+        ...(prepared.flags ?? {}),
+        [MODULE_ID]: {
+          eventId: event.eventId,
+          protocolVersion: event.protocolVersion,
+          sourceRollEventId: event.sourceRollEventId,
+          actionId: event.action.id,
+          actionKind: event.action.kind,
+          ...(event.action.kind === "roll_damage"
+            ? { damageType: event.action.damageType }
+            : {}),
+        },
+      },
+    },
+    { keepId: true },
+  );
+  if (!created) throw new Error("Foundry did not create the action roll message");
+  return created;
 }

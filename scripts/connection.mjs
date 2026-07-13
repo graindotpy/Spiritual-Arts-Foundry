@@ -1,14 +1,18 @@
 import { RECONNECT, WEBSOCKET_URL } from "./constants.mjs";
-import { parseSpiritRollMessage } from "./protocol.mjs";
+import { parseRealtimeMessage } from "./protocol.mjs";
 
 export class RollBridgeConnection {
   constructor({
+    onEvent,
     onRoll,
     shouldConnect,
     url = WEBSOCKET_URL,
     WebSocketClass = globalThis.WebSocket,
   }) {
-    this.onRoll = onRoll;
+    this.onEvent = onEvent ?? onRoll;
+    if (typeof this.onEvent !== "function") {
+      throw new TypeError("RollBridgeConnection requires an event handler");
+    }
     this.shouldConnect = shouldConnect;
     this.url = url;
     this.WebSocketClass = WebSocketClass;
@@ -65,8 +69,8 @@ export class RollBridgeConnection {
 
     socket.onmessage = (event) => {
       if (this.socket !== socket || this.stopped) return;
-      const roll = parseSpiritRollMessage(event.data);
-      if (roll) this.onRoll(roll);
+      const parsedEvent = parseRealtimeMessage(event.data);
+      if (parsedEvent) this.onEvent(parsedEvent);
     };
 
     socket.onerror = () => {

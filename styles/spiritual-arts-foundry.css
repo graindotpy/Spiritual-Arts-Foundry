@@ -115,3 +115,18 @@
   color: var(--sa-muted);
   font-size: 0.68rem;
 }
+
+.spiritual-arts-action-flavor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.spiritual-arts-action-flavor strong {
+  color: #263a33;
+}
+
+.spiritual-arts-action-flavor span {
+  color: #68675f;
+  font-size: 0.75rem;
+}

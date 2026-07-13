@@ -2,7 +2,7 @@
   "id": "spiritual-arts-foundry",
   "type": "module",
   "title": "Spiritual Arts Roll Bridge",
-  "description": "Displays website-authoritative Spiritual Arts rolls in Foundry VTT chat.",
+  "description": "Displays website-authoritative Spirit Die results and executes validated damage or healing rolls in Foundry VTT chat.",
   "version": "0.1.0",
   "authors": [
     {

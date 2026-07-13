@@ -1,42 +1,222 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MAX_WEBSOCKET_MESSAGE_LENGTH } from "../scripts/constants.mjs";
-import { parseSpiritRollMessage } from "../scripts/protocol.mjs";
-import { serializedMessage, validMessage } from "./fixtures.mjs";
+import {
+  DAMAGE_TYPES,
+  FORMULA_LIMITS,
+  isSafeRollFormula,
+  parseFoundryActionMessage,
+  parseRealtimeMessage,
+  parseSpiritRollMessage,
+} from "../scripts/protocol.mjs";
+import {
+  serializedActionMessage,
+  serializedMessage,
+  validDamageActionMessage,
+  validMessage,
+} from "./fixtures.mjs";
 
-test("parses a version-one Spiritual Arts roll", () => {
+test("parses a version-one Spiritual Arts roll without changing its data", () => {
   const parsed = parseSpiritRollMessage(serializedMessage());
 
   assert.equal(parsed?.protocolVersion, 1);
+  assert.equal(parsed?.type, "spirit_die_roll");
   assert.equal(parsed?.eventId, validMessage.eventId);
   assert.equal(parsed?.character.name, "Raan");
   assert.equal(parsed?.roll.techniqueName, "Devour Essence");
   assert.equal(parsed?.roll.value, 6);
 });
 
-test("rejects unversioned, future-version, and invalid-ID envelopes", () => {
-  const unversioned = structuredClone(validMessage);
-  delete unversioned.protocolVersion;
-  assert.equal(parseSpiritRollMessage(JSON.stringify(unversioned)), null);
+test("preserves legacy Spirit rolls that omit optional technique metadata", () => {
+  const legacy = structuredClone(validMessage);
+  delete legacy.data.roll.techniqueId;
+  delete legacy.data.roll.techniqueName;
 
-  assert.equal(
-    parseSpiritRollMessage(serializedMessage({ protocolVersion: 2 })),
-    null,
-  );
-  assert.equal(
-    parseSpiritRollMessage(serializedMessage({ eventId: "not-a-uuid" })),
-    null,
-  );
+  const parsed = parseSpiritRollMessage(JSON.stringify(legacy));
+  assert.equal(parsed?.type, "spirit_die_roll");
+  assert.equal(parsed?.roll.techniqueId, null);
+  assert.equal(parsed?.roll.techniqueName, null);
 });
 
-test("rejects malformed, oversized, and internally inconsistent rolls", () => {
-  assert.equal(parseSpiritRollMessage("{"), null);
+test("parses valid damage and healing action requests as a discriminated union", () => {
+  const damage = parseRealtimeMessage(serializedActionMessage());
+  assert.equal(damage?.type, "foundry_action_request");
+  assert.equal(damage?.action.kind, "roll_damage");
+  assert.equal(damage?.action.damageType, "necrotic");
+  assert.equal(damage?.sourceRollEventId, validMessage.eventId);
+
+  const healingMessage = structuredClone(validDamageActionMessage);
+  healingMessage.data.action = {
+    id: "34109839-d482-4ef7-bde4-98ce40d330f2",
+    kind: "roll_healing",
+    formula: "3d8 + 5",
+  };
+  const healing = parseFoundryActionMessage(JSON.stringify(healingMessage));
+  assert.equal(healing?.action.kind, "roll_healing");
+  assert.equal(healing?.action.formula, "3d8 + 5");
+  assert.equal(Object.hasOwn(healing.action, "damageType"), false);
+
+  for (const damageType of DAMAGE_TYPES) {
+    const message = structuredClone(validDamageActionMessage);
+    message.data.action.damageType = damageType;
+    assert.equal(
+      parseFoundryActionMessage(JSON.stringify(message))?.action.damageType,
+      damageType,
+    );
+  }
+});
+
+test("rejects unversioned, future-version, invalid-ID, and unknown envelopes", () => {
+  const unversioned = structuredClone(validMessage);
+  delete unversioned.protocolVersion;
+  assert.equal(parseRealtimeMessage(JSON.stringify(unversioned)), null);
   assert.equal(
-    parseSpiritRollMessage("x".repeat(MAX_WEBSOCKET_MESSAGE_LENGTH + 1)),
+    parseRealtimeMessage(serializedMessage({ protocolVersion: 2 })),
+    null,
+  );
+  assert.equal(
+    parseRealtimeMessage(serializedMessage({ eventId: "not-a-uuid" })),
+    null,
+  );
+  assert.equal(
+    parseRealtimeMessage(serializedMessage({ type: "future_event" })),
+    null,
+  );
+
+  const unknownField = structuredClone(validDamageActionMessage);
+  unknownField.data.action.macro = "game.dice3d";
+  assert.equal(parseRealtimeMessage(JSON.stringify(unknownField)), null);
+});
+
+test("rejects malformed, oversized, and internally inconsistent Spirit Die rolls", () => {
+  assert.equal(parseRealtimeMessage("{"), null);
+  assert.equal(
+    parseRealtimeMessage("x".repeat(MAX_WEBSOCKET_MESSAGE_LENGTH + 1)),
     null,
   );
 
   const inconsistent = structuredClone(validMessage);
   inconsistent.data.roll.success = false;
-  assert.equal(parseSpiritRollMessage(JSON.stringify(inconsistent)), null);
+  assert.equal(parseRealtimeMessage(JSON.stringify(inconsistent)), null);
+
+  const extraCharacterField = structuredClone(validMessage);
+  extraCharacterField.data.character.actorId = "not-supported";
+  assert.equal(parseRealtimeMessage(JSON.stringify(extraCharacterField)), null);
+});
+
+test("accepts only the bounded phase-one formula grammar", () => {
+  for (const formula of [
+    "2d8 + 4",
+    "1D6+1d4",
+    "3d10 - 2",
+    "0",
+    "100d1000",
+    " 1d6 + 2 ",
+  ]) {
+    assert.equal(isSafeRollFormula(formula), true, formula);
+  }
+
+  for (const formula of [
+    "",
+    "-2 + 1d6",
+    "+1d6",
+    "1d6++2",
+    "1 d 6",
+    "1d1",
+    "101d6",
+    "51d6 + 50d6",
+    "1d1001",
+    "1000001",
+    "1d6 * 2",
+    "(1d6 + 2)",
+    "1d6kh",
+    "1d6[fire]",
+    "@mod + 1d6",
+    "Math.max(1, 2)",
+    "game.macros.getName('x').execute()",
+    "[[/r 1d6]]",
+    "1d6; alert(1)",
+    "1d6 +",
+    "1d6".padEnd(FORMULA_LIMITS.MAX_LENGTH + 1, " "),
+  ]) {
+    assert.equal(isSafeRollFormula(formula), false, formula);
+  }
+
+  const tooManyTerms = Array.from(
+    { length: FORMULA_LIMITS.MAX_TERMS + 1 },
+    () => "0",
+  ).join("+");
+  assert.equal(isSafeRollFormula(tooManyTerms), false);
+});
+
+test("rejects invalid action kinds, damage typing, labels, and nested fields", () => {
+  const cases = [];
+
+  const unknownKind = structuredClone(validDamageActionMessage);
+  unknownKind.data.action.kind = "run_macro";
+  cases.push(unknownKind);
+
+  const missingDamageType = structuredClone(validDamageActionMessage);
+  delete missingDamageType.data.action.damageType;
+  cases.push(missingDamageType);
+
+  const invalidDamageType = structuredClone(validDamageActionMessage);
+  invalidDamageType.data.action.damageType = "untyped";
+  cases.push(invalidDamageType);
+
+  const healingDamageType = structuredClone(validDamageActionMessage);
+  healingDamageType.data.action.kind = "roll_healing";
+  cases.push(healingDamageType);
+
+  const unsafeFormula = structuredClone(validDamageActionMessage);
+  unsafeFormula.data.action.formula = "@abilities.str.mod + 1d8";
+  cases.push(unsafeFormula);
+
+  const emptyLabel = structuredClone(validDamageActionMessage);
+  emptyLabel.data.action.label = "   ";
+  cases.push(emptyLabel);
+
+  const longLabel = structuredClone(validDamageActionMessage);
+  longLabel.data.action.label = "x".repeat(256);
+  cases.push(longLabel);
+
+  const longFormula = structuredClone(validDamageActionMessage);
+  longFormula.data.action.formula = "1".repeat(201);
+  cases.push(longFormula);
+
+  const extraTechniqueField = structuredClone(validDamageActionMessage);
+  extraTechniqueField.data.technique.actorUuid = "Actor.fake";
+  cases.push(extraTechniqueField);
+
+  const longTechniqueName = structuredClone(validDamageActionMessage);
+  longTechniqueName.data.technique.name = "x".repeat(256);
+  cases.push(longTechniqueName);
+
+  const invalidTimestamp = structuredClone(validDamageActionMessage);
+  invalidTimestamp.data.requestedAt = "now";
+  cases.push(invalidTimestamp);
+
+  const invalidSourceId = structuredClone(validDamageActionMessage);
+  invalidSourceId.data.sourceRollEventId = "not-a-uuid";
+  cases.push(invalidSourceId);
+
+  const invalidLevel = structuredClone(validDamageActionMessage);
+  invalidLevel.data.character.level = 21;
+  cases.push(invalidLevel);
+
+  const invalidSp = structuredClone(validDamageActionMessage);
+  invalidSp.data.spInvestment = 101;
+  cases.push(invalidSp);
+
+  const extraDataField = structuredClone(validDamageActionMessage);
+  extraDataField.data.macro = "forbidden";
+  cases.push(extraDataField);
+
+  for (const actionEvent of cases) {
+    assert.equal(
+      parseFoundryActionMessage(JSON.stringify(actionEvent)),
+      null,
+      JSON.stringify(actionEvent.data.action),
+    );
+  }
 });

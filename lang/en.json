@@ -7,5 +7,9 @@
   "SPIRITUAL_ARTS.Chat.Failure": "Failure",
   "SPIRITUAL_ARTS.Chat.SpInvestment": "{sp} SP invested",
   "SPIRITUAL_ARTS.Chat.TechniqueFallback": "{sp} SP technique",
-  "SPIRITUAL_ARTS.Chat.RolledAt": "Rolled at {time}"
+  "SPIRITUAL_ARTS.Chat.RolledAt": "Rolled at {time}",
+  "SPIRITUAL_ARTS.Chat.DamageRoll": "Damage roll",
+  "SPIRITUAL_ARTS.Chat.HealingRoll": "Healing roll",
+  "SPIRITUAL_ARTS.Chat.DamageType": "{type} damage",
+  "SPIRITUAL_ARTS.Chat.Healing": "Healing"
 }

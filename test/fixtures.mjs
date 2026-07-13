@@ -29,3 +29,33 @@ export function serializedMessage(update = {}) {
     ...update,
   });
 }
+
+export const validDamageActionMessage = Object.freeze({
+  protocolVersion: 1,
+  eventId: "e131f252-9d65-4f43-a822-243e2560ed60",
+  type: "foundry_action_request",
+  data: {
+    requestedAt: "2026-07-13T12:00:00.100Z",
+    sourceRollEventId: validMessage.eventId,
+    character: structuredClone(validMessage.data.character),
+    technique: {
+      id: "89843a7a-b538-4c16-beee-56255e41615e",
+      name: "Devour Essence",
+    },
+    spInvestment: 2,
+    action: {
+      id: "1de7331d-7607-4932-8392-379710cc30f1",
+      kind: "roll_damage",
+      formula: "2d8 + 4",
+      damageType: "necrotic",
+      label: "Essence damage",
+    },
+  },
+});
+
+export function serializedActionMessage(update = {}) {
+  return JSON.stringify({
+    ...structuredClone(validDamageActionMessage),
+    ...update,
+  });
+}

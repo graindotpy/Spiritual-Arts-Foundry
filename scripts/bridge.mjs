@@ -1,6 +1,9 @@
 import { RollBridgeConnection } from "./connection.mjs";
 import { MAX_SEEN_EVENT_IDS, MODULE_ID } from "./constants.mjs";
-import { createRollChatMessage } from "./chat-message.mjs";
+import {
+  createActionRollChatMessage,
+  createRollChatMessage,
+} from "./chat-message.mjs";
 import { BoundedEventSet } from "./deduplication.mjs";
 import { isDesignatedBridgeUser } from "./settings.mjs";
 
@@ -18,7 +21,7 @@ export class SpiritualArtsBridge {
     this.queue = Promise.resolve();
     this.connection = new RollBridgeConnection({
       shouldConnect: isDesignatedBridgeUser,
-      onRoll: (event) => this.#enqueue(event),
+      onEvent: (event) => this.#enqueue(event),
     });
   }
 
@@ -32,13 +35,16 @@ export class SpiritualArtsBridge {
 
   #enqueue(event) {
     this.queue = this.queue
-      .then(() => this.#handleRoll(event))
+      .then(() => this.#handleEvent(event))
       .catch((error) => {
-        console.error(`${MODULE_ID} | Failed to create roll chat message`, error);
+        console.error(
+          `${MODULE_ID} | Failed to execute ${event.type} ${event.eventId}`,
+          error,
+        );
       });
   }
 
-  async #handleRoll(event) {
+  async #handleEvent(event) {
     if (!isDesignatedBridgeUser()) {
       this.stop();
       return;
@@ -49,7 +55,13 @@ export class SpiritualArtsBridge {
       return;
     }
 
-    await createRollChatMessage(event);
+    if (event.type === "spirit_die_roll") {
+      await createRollChatMessage(event);
+    } else if (event.type === "foundry_action_request") {
+      await createActionRollChatMessage(event);
+    } else {
+      return;
+    }
     this.seen.add(event.eventId);
   }
 }

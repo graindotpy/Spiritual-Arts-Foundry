@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RollBridgeConnection } from "../scripts/connection.mjs";
-import { serializedMessage } from "./fixtures.mjs";
+import { serializedActionMessage, serializedMessage } from "./fixtures.mjs";
 
 class FakeWebSocket {
   static instances = [];
@@ -37,9 +37,9 @@ test("does not connect when this is not the designated Foundry user", () => {
 
 test("delivers only valid live messages while connected", () => {
   FakeWebSocket.instances = [];
-  const rolls = [];
+  const events = [];
   const connection = new RollBridgeConnection({
-    onRoll: (roll) => rolls.push(roll),
+    onEvent: (event) => events.push(event),
     shouldConnect: () => true,
     WebSocketClass: FakeWebSocket,
   });
@@ -48,9 +48,13 @@ test("delivers only valid live messages while connected", () => {
   const socket = FakeWebSocket.instances[0];
   socket.emitMessage("invalid");
   socket.emitMessage(serializedMessage());
+  socket.emitMessage(serializedActionMessage());
 
-  assert.equal(rolls.length, 1);
-  assert.equal(rolls[0].character.name, "Raan");
+  assert.equal(events.length, 2);
+  assert.equal(events[0].type, "spirit_die_roll");
+  assert.equal(events[0].character.name, "Raan");
+  assert.equal(events[1].type, "foundry_action_request");
+  assert.equal(events[1].action.kind, "roll_damage");
 
   connection.stop();
   assert.equal(socket.closed, true);
