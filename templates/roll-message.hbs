@@ -1,0 +1,29 @@
+<article class="spiritual-arts-roll {{outcomeClass}}">
+  <header class="spiritual-arts-roll__header">
+    {{#if portraitUrl}}
+      <img
+        class="spiritual-arts-roll__portrait"
+        src="{{portraitUrl}}"
+        alt=""
+      >
+    {{/if}}
+    <div class="spiritual-arts-roll__identity">
+      <p class="spiritual-arts-roll__eyebrow">{{source}}</p>
+      <h3>{{characterName}}</h3>
+      <p>{{characterPath}} · Level {{characterLevel}}</p>
+    </div>
+  </header>
+
+  <div class="spiritual-arts-roll__technique">{{techniqueName}}</div>
+
+  <div class="spiritual-arts-roll__result">
+    <span class="spiritual-arts-roll__die">{{dieSize}}</span>
+    <strong>{{value}}</strong>
+    <span class="spiritual-arts-roll__outcome">{{outcome}}</span>
+  </div>
+
+  <footer>
+    <span>{{spInvestment}}</span>
+    <span>{{rolledAt}}</span>
+  </footer>
+</article>

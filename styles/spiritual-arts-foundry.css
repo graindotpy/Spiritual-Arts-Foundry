@@ -1,0 +1,117 @@
+.spiritual-arts-roll {
+  --sa-accent: #8d6b40;
+  --sa-ink: #263a33;
+  --sa-muted: #68675f;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sa-accent) 45%, transparent);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at top right, rgb(141 107 64 / 14%), transparent 42%),
+    #f8f1e4;
+  color: var(--sa-ink);
+  box-shadow: 0 2px 8px rgb(47 38 25 / 12%);
+}
+
+.spiritual-arts-roll__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid rgb(141 107 64 / 24%);
+}
+
+.spiritual-arts-roll__portrait {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid rgb(141 107 64 / 45%);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.spiritual-arts-roll__identity {
+  min-width: 0;
+}
+
+.spiritual-arts-roll__identity h3,
+.spiritual-arts-roll__identity p {
+  margin: 0;
+}
+
+.spiritual-arts-roll__identity h3 {
+  overflow: hidden;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spiritual-arts-roll__identity > p:last-child {
+  margin-top: 2px;
+  color: var(--sa-muted);
+  font-size: 0.75rem;
+}
+
+.spiritual-arts-roll .spiritual-arts-roll__eyebrow {
+  margin-bottom: 2px;
+  color: var(--sa-accent);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.spiritual-arts-roll__technique {
+  padding: 10px 12px 4px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.spiritual-arts-roll__result {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 12px;
+}
+
+.spiritual-arts-roll__result strong {
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.spiritual-arts-roll__die,
+.spiritual-arts-roll__outcome {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.spiritual-arts-roll__die {
+  justify-self: end;
+  color: var(--sa-muted);
+}
+
+.spiritual-arts-roll__outcome {
+  justify-self: start;
+}
+
+.spiritual-arts-roll.is-success .spiritual-arts-roll__outcome {
+  color: #2f6b50;
+}
+
+.spiritual-arts-roll.is-failure .spiritual-arts-roll__outcome {
+  color: #9a4439;
+}
+
+.spiritual-arts-roll footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-top: 1px solid rgb(141 107 64 / 18%);
+  background: rgb(141 107 64 / 7%);
+  color: var(--sa-muted);
+  font-size: 0.68rem;
+}

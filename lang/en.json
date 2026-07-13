@@ -1,0 +1,11 @@
+{
+  "SPIRITUAL_ARTS.Settings.BridgeUser.Name": "Roll bridge user",
+  "SPIRITUAL_ARTS.Settings.BridgeUser.Hint": "Only this Foundry user connects to the Spiritual Arts website and creates roll messages. Leave disabled to turn the bridge off.",
+  "SPIRITUAL_ARTS.Settings.BridgeUser.Disabled": "Disabled",
+  "SPIRITUAL_ARTS.Chat.Source": "Spiritual Arts",
+  "SPIRITUAL_ARTS.Chat.Success": "Success",
+  "SPIRITUAL_ARTS.Chat.Failure": "Failure",
+  "SPIRITUAL_ARTS.Chat.SpInvestment": "{sp} SP invested",
+  "SPIRITUAL_ARTS.Chat.TechniqueFallback": "{sp} SP technique",
+  "SPIRITUAL_ARTS.Chat.RolledAt": "Rolled at {time}"
+}
