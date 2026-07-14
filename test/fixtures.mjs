@@ -68,9 +68,31 @@ export const validEnhancedDamageActionMessage = Object.freeze({
   },
 });
 
+export const validSavingThrowActionMessage = Object.freeze({
+  ...structuredClone(validDamageActionMessage),
+  eventId: "4d4f40e1-96d0-4861-b75e-1a3d5b5513bb",
+  data: {
+    ...structuredClone(validDamageActionMessage.data),
+    action: {
+      id: "49c1f688-3a4e-4d34-8bde-8f9786798bba",
+      kind: "saving_throw",
+      label: "Resist the push",
+      savingThrow: { ability: "str" },
+      template: { type: "cone", distance: 15, angle: 90 },
+    },
+  },
+});
+
 export function serializedActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validDamageActionMessage),
+    ...update,
+  });
+}
+
+export function serializedSavingThrowActionMessage(update = {}) {
+  return JSON.stringify({
+    ...structuredClone(validSavingThrowActionMessage),
     ...update,
   });
 }

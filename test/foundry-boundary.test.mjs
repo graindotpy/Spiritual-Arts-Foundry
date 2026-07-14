@@ -4,6 +4,7 @@ import {
   buildActionFlavor,
   buildRollMessageContext,
   chatMessageIdForEvent,
+  createActionChatMessage,
   createActionRollChatMessage,
   createRollChatMessage,
 } from "../scripts/chat-message.mjs";
@@ -21,6 +22,7 @@ import {
   serializedActionMessage,
   serializedMessage,
   validEnhancedDamageActionMessage,
+  validSavingThrowActionMessage,
 } from "./fixtures.mjs";
 
 function installGame({ selectedUserId = "bridge-user" } = {}) {
@@ -171,6 +173,55 @@ test("evaluates and creates an action as a native Foundry v12 roll message", asy
   assert.match(created.data.flavor, /16/);
   assert.match(created.data.flavor, /place-spiritual-arts-template/);
   assert.equal(buildActionFlavor(event), created.data.flavor);
+});
+
+test("creates a save-only action card without using Foundry's Roll API", async () => {
+  installGame();
+  const actionMessage = structuredClone(validSavingThrowActionMessage);
+  delete actionMessage.data.action.label;
+  const event = parseFoundryActionMessage(JSON.stringify(actionMessage));
+  const calls = [];
+
+  globalThis.Roll = class UnexpectedRoll {
+    static validate() {
+      calls.push("validate");
+      return true;
+    }
+
+    constructor() {
+      calls.push("construct");
+    }
+  };
+  globalThis.ChatMessage = {
+    create: async (data, options) => {
+      calls.push("create");
+      return { data, options };
+    },
+  };
+
+  const created = await createActionChatMessage(event);
+
+  assert.deepEqual(calls, ["create"]);
+  assert.equal(created.data._id, chatMessageIdForEvent(event.eventId));
+  assert.equal(created.data.author, "bridge-user");
+  assert.deepEqual(created.data.speaker, { alias: "Bridge User" });
+  assert.equal(created.data.flavor, "SPIRITUAL_ARTS.Chat.Source");
+  assert.equal(Object.hasOwn(created.data, "rolls"), false);
+  assert.match(created.data.content, /SavingThrowAction/);
+  assert.match(created.data.content, /SavingThrow/);
+  assert.match(created.data.content, /16/);
+  assert.match(created.data.content, /place-spiritual-arts-template/);
+  assert.deepEqual(created.data.flags["spiritual-arts-foundry"], {
+    eventId: event.eventId,
+    protocolVersion: 1,
+    sourceRollEventId: event.sourceRollEventId,
+    actionId: event.action.id,
+    actionKind: "saving_throw",
+    spiritualArtsDc: 16,
+    savingThrow: { ability: "str" },
+    template: { type: "cone", distance: 15, angle: 90 },
+  });
+  assert.deepEqual(created.options, { keepId: true });
 });
 
 test("renders an unavailable DC when a configured save has a null or omitted character DC", () => {

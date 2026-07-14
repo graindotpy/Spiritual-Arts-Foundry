@@ -13,9 +13,11 @@ import {
   serializedActionMessage,
   serializedLegacyActionMessage,
   serializedMessage,
+  serializedSavingThrowActionMessage,
   validDamageActionMessage,
   validEnhancedDamageActionMessage,
   validMessage,
+  validSavingThrowActionMessage,
 } from "./fixtures.mjs";
 
 test("parses a version-one Spiritual Arts roll without changing its data", () => {
@@ -66,6 +68,35 @@ test("parses valid damage and healing action requests as a discriminated union",
       damageType,
     );
   }
+});
+
+test("parses a save-only action without a formula or damage type", () => {
+  const savingThrow = parseFoundryActionMessage(
+    serializedSavingThrowActionMessage(),
+  );
+
+  assert.equal(savingThrow?.action.kind, "saving_throw");
+  assert.equal(savingThrow?.action.label, "Resist the push");
+  assert.deepEqual(savingThrow?.action.savingThrow, { ability: "str" });
+  assert.deepEqual(savingThrow?.action.template, {
+    type: "cone",
+    distance: 15,
+    angle: 90,
+  });
+  assert.equal(Object.hasOwn(savingThrow.action, "formula"), false);
+  assert.equal(Object.hasOwn(savingThrow.action, "damageType"), false);
+
+  const withoutTemplate = structuredClone(validSavingThrowActionMessage);
+  delete withoutTemplate.data.action.label;
+  delete withoutTemplate.data.action.template;
+  assert.deepEqual(
+    parseFoundryActionMessage(JSON.stringify(withoutTemplate))?.action,
+    {
+      id: withoutTemplate.data.action.id,
+      kind: "saving_throw",
+      savingThrow: { ability: "str" },
+    },
+  );
 });
 
 test("parses bounded saving throws and all measured template shapes", () => {
@@ -214,6 +245,18 @@ test("rejects invalid action kinds, damage typing, labels, and nested fields", (
   const healingDamageType = structuredClone(validDamageActionMessage);
   healingDamageType.data.action.kind = "roll_healing";
   cases.push(healingDamageType);
+
+  const savingThrowFormula = structuredClone(validSavingThrowActionMessage);
+  savingThrowFormula.data.action.formula = "1d20";
+  cases.push(savingThrowFormula);
+
+  const savingThrowDamageType = structuredClone(validSavingThrowActionMessage);
+  savingThrowDamageType.data.action.damageType = "force";
+  cases.push(savingThrowDamageType);
+
+  const savingThrowWithoutSave = structuredClone(validSavingThrowActionMessage);
+  delete savingThrowWithoutSave.data.action.savingThrow;
+  cases.push(savingThrowWithoutSave);
 
   const unsafeFormula = structuredClone(validDamageActionMessage);
   unsafeFormula.data.action.formula = "@abilities.str.mod + 1d8";

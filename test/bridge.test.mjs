@@ -3,7 +3,10 @@ import { test } from "node:test";
 import { SpiritualArtsBridge } from "../scripts/bridge.mjs";
 import { MODULE_ID } from "../scripts/constants.mjs";
 import { parseFoundryActionMessage } from "../scripts/protocol.mjs";
-import { serializedActionMessage } from "./fixtures.mjs";
+import {
+  serializedActionMessage,
+  serializedSavingThrowActionMessage,
+} from "./fixtures.mjs";
 
 function installGame({ currentUserId = "bridge-user" } = {}) {
   globalThis.game = {
@@ -65,6 +68,23 @@ test("rechecks bridge-user designation before executing an action", async () => 
 
   assert.deepEqual(calls, { validate: 0, evaluate: 0, create: 0 });
   assert.equal(bridge.seen.size, 0);
+});
+
+test("routes save-only actions directly to ChatMessage creation", async () => {
+  installGame();
+  const calls = installRollBoundary();
+  const event = parseFoundryActionMessage(serializedSavingThrowActionMessage());
+  const bridge = new SpiritualArtsBridge();
+
+  bridge.connection.onEvent(event);
+  await bridge.queue;
+
+  assert.deepEqual(calls, { validate: 0, evaluate: 0, create: 1 });
+  assert.equal(bridge.seen.has(event.eventId), true);
+  assert.equal(
+    game.messages[0].getFlag(MODULE_ID, "actionKind"),
+    "saving_throw",
+  );
 });
 
 test("suppresses in-memory duplicates and events found in message flags", async () => {

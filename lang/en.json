@@ -1,6 +1,6 @@
 {
   "SPIRITUAL_ARTS.Settings.BridgeUser.Name": "Roll bridge user",
-  "SPIRITUAL_ARTS.Settings.BridgeUser.Hint": "Only this Foundry user connects to the Spiritual Arts website and creates roll messages. Leave disabled to turn the bridge off.",
+  "SPIRITUAL_ARTS.Settings.BridgeUser.Hint": "Only this Foundry user connects to the Spiritual Arts website and creates roll or save messages. Leave disabled to turn the bridge off.",
   "SPIRITUAL_ARTS.Settings.BridgeUser.Disabled": "Disabled",
   "SPIRITUAL_ARTS.Chat.Source": "Spiritual Arts",
   "SPIRITUAL_ARTS.Chat.Success": "Success",
@@ -10,6 +10,7 @@
   "SPIRITUAL_ARTS.Chat.RolledAt": "Rolled at {time}",
   "SPIRITUAL_ARTS.Chat.DamageRoll": "Damage roll",
   "SPIRITUAL_ARTS.Chat.HealingRoll": "Healing roll",
+  "SPIRITUAL_ARTS.Chat.SavingThrowAction": "Saving throw",
   "SPIRITUAL_ARTS.Chat.DamageType": "{type} damage",
   "SPIRITUAL_ARTS.Chat.Healing": "Healing",
   "SPIRITUAL_ARTS.Chat.Ability.str": "STRENGTH",

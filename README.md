@@ -6,20 +6,26 @@ Foundry chat. It targets Foundry VTT 12 and Dungeons & Dragons Fifth Edition
 4.3.9.
 
 Spirit Die results remain authoritative on the website. Phase one also lets the
-website request tightly constrained damage and healing rolls; those dice are
-rolled by Foundry Core and are authoritative in Foundry.
+website request tightly constrained damage and healing rolls, plus
+informational saving throws that do not need an attached damage or healing
+roll. Requested dice are rolled by Foundry Core and are authoritative in
+Foundry.
 
 ## Behaviour
 
 - Only the Foundry user selected in the world setting opens the website
   WebSocket and authors messages. Other Foundry clients remain silent.
 - Existing `spirit_die_roll` events keep their styled chat-card output.
-- Each `foundry_action_request` becomes a native Foundry Core roll message. Its
-  flavor identifies the website character, technique, action label, and damage
-  or healing type.
-- Actions can optionally show the character's Spiritual Arts save DC and target
-  ability. They can also include a button that enters Foundry's standard
-  measured-template preview and placement workflow for the clicking user.
+- Damage and healing `foundry_action_request` events become native Foundry Core
+  roll messages. Their flavor identifies the website character, technique,
+  action label, and damage or healing type.
+- A save-only request becomes a normal non-roll ChatMessage card. It shows the
+  informational DC and target ability and can carry the same optional measured
+  template control without constructing or evaluating a Foundry `Roll`.
+- Roll actions can optionally show the character's Spiritual Arts save DC and
+  target ability; save-only actions always do. Either kind can include a button
+  that enters Foundry's standard measured-template preview and placement
+  workflow for the clicking user.
 - No Foundry Actor is selected or changed. There is no automatic damage,
   healing, targeting, attack roll, saving-throw roll, condition, or active
   effect. Placed templates are plain scene documents with no mechanical logic.
@@ -68,7 +74,8 @@ wss://spiritualarts.grainserver.co.uk/ws
 The parser accepts only protocol version 1 and the event types
 `spirit_die_roll` and `foundry_action_request`. Every object is validated with a
 strict field allowlist; unknown fields, versions, and event types are ignored.
-Malformed events and failed rolls are isolated and do not close the WebSocket.
+Malformed events and failed actions are isolated and do not close the
+WebSocket.
 
 One action request has this wire shape:
 
@@ -118,6 +125,24 @@ poison, psychic, radiant, slashing, thunder
 ```
 
 Healing actions use `"kind": "roll_healing"` and must omit `damageType`.
+Both roll kinds require `formula`; either may also include `savingThrow`.
+
+A saving throw with no attached dice uses this strict action shape:
+
+```json
+{
+  "id": "49c1f688-3a4e-4d34-8bde-8f9786798bba",
+  "kind": "saving_throw",
+  "label": "Resist the push",
+  "savingThrow": { "ability": "str" },
+  "template": { "type": "cone", "distance": 15, "angle": 90 }
+}
+```
+
+For `saving_throw`, `savingThrow` is required, `label` and `template` are
+optional, and `formula` and `damageType` are rejected. Consequently every
+accepted action specifies dice, a saving throw, or both; a template by itself
+is not an action.
 
 `spiritualArtsDc` is optional for rolling-deployment compatibility. When
 present it is an integer from 1 to 100, or `null` when unavailable; omission is
@@ -147,8 +172,9 @@ chat control.
 
 ## Formula safety
 
-The module independently enforces the phase-one grammar before also calling
-Foundry Core's `Roll.validate`:
+For damage and healing actions, the module independently enforces the phase-one
+grammar before also calling Foundry Core's `Roll.validate`. Save-only actions
+do not call the Roll API:
 
 - A formula is at most 200 characters before trimming and at most 50 terms.
 - A term is an unsigned integer or `NdM` dice term. Terms may be joined only by
@@ -164,17 +190,17 @@ Examples accepted: `2d8 + 4`, `1d6 + 1d4`, `3d10 - 2`.
 ## Tests
 
 The tests exercise strict protocol parsing, formula bounds, bridge-user gating,
-native Roll and ChatMessage boundaries, deterministic IDs and flags, duplicate
-suppression, retryability after failed creation, reconnection-safe event
-handling, measured-template conversion and preview boundaries, and the
+native Roll and plain ChatMessage boundaries, deterministic IDs and flags,
+duplicate suppression, retryability after failed creation, reconnection-safe
+event handling, measured-template conversion and preview boundaries, and the
 unchanged Spirit Die renderer.
 
 ```powershell
 npm test
 ```
 
-Final Roll and ChatMessage rendering must also be checked in a Foundry v12
-world because Foundry globals are unavailable to Node tests.
+Final roll and save-only ChatMessage rendering must also be checked in a
+Foundry v12 world because Foundry globals are unavailable to Node tests.
 
 ## First Foundry v12 smoke test
 
@@ -184,10 +210,13 @@ world because Foundry globals are unavailable to Node tests.
    browser developer console and confirm the WebSocket connects without module
    errors. A different logged-in Foundry user should remain inactive.
 3. On the website, use a character-owned technique whose selected SP tier has
-   one damage action (`2d8 + 4`, `necrotic`) and one healing action (`1d6`).
-4. Make a Spirit Die roll for that technique and exact SP tier; either a success or failure triggers its actions.
+   one damage action (`2d8 + 4`, `necrotic`), one healing action (`1d6`), and
+   one save-only action with no formula.
+4. Make a Spirit Die roll for that technique and exact SP tier; either a
+   success or failure triggers its actions.
 5. Confirm Foundry chat shows the existing Spirit Die card followed by two
-   separate native roll messages authored by the selected bridge user.
+   separate native roll messages plus a plain save-only card authored by the
+   selected bridge user.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
    flavor shows the website character, technique, configured/fallback action
    label, and `Necrotic damage` or `Healing`.
@@ -195,8 +224,11 @@ world because Foundry globals are unavailable to Node tests.
    card displays the character's Spiritual Arts DC and a measured-template
    button. Click it as a permitted user, place the circle, and confirm it is a
    plain 20-foot-radius scene template. Right-click should cancel a preview.
+   Confirm the save-only card displays its configured ability and optional
+   template in the same way, but contains no dice result or tooltip.
 8. Make a failed Spirit Die roll for the same tier and confirm the configured
-   damage/healing actions and controls still follow the failure card.
+   damage/healing and save-only actions and controls still follow the failure
+   card.
 9. Sign the bridge user out, make another website roll, then sign back in.
    Confirm the missed events are not replayed.
 

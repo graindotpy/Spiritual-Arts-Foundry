@@ -116,18 +116,23 @@ function measuredTemplateButtonHtml(event) {
 
 export function buildActionFlavor(event) {
   const isDamage = event.action.kind === "roll_damage";
+  const isHealing = event.action.kind === "roll_healing";
   const actionLabel =
     event.action.label ??
     localize(
       isDamage
         ? "SPIRITUAL_ARTS.Chat.DamageRoll"
-        : "SPIRITUAL_ARTS.Chat.HealingRoll",
+        : isHealing
+          ? "SPIRITUAL_ARTS.Chat.HealingRoll"
+          : "SPIRITUAL_ARTS.Chat.SavingThrowAction",
     );
   const rollType = isDamage
     ? localize("SPIRITUAL_ARTS.Chat.DamageType", {
         type: titleCase(event.action.damageType),
       })
-    : localize("SPIRITUAL_ARTS.Chat.Healing");
+    : isHealing
+      ? localize("SPIRITUAL_ARTS.Chat.Healing")
+      : null;
   const savingThrow = savingThrowHtml(event);
   const measuredTemplateButton = measuredTemplateButtonHtml(event);
 
@@ -135,7 +140,7 @@ export function buildActionFlavor(event) {
     '<div class="spiritual-arts-action-flavor">',
     `<strong>${escapeHtml(actionLabel)}</strong>`,
     `<span>${escapeHtml(event.character.name)} &middot; ${escapeHtml(event.technique.name)}</span>`,
-    `<span>${escapeHtml(rollType)}</span>`,
+    rollType === null ? "" : `<span>${escapeHtml(rollType)}</span>`,
     savingThrow || measuredTemplateButton
       ? `<div class="spiritual-arts-action-controls">${savingThrow}${measuredTemplateButton}</div>`
       : "",
@@ -166,6 +171,50 @@ export async function createRollChatMessage(event) {
     { keepId: true },
   );
   if (!created) throw new Error("Foundry did not create the Spirit Die message");
+  return created;
+}
+
+function actionMessageFlags(event, existingFlags = {}) {
+  return {
+    ...existingFlags,
+    [MODULE_ID]: {
+      eventId: event.eventId,
+      protocolVersion: event.protocolVersion,
+      sourceRollEventId: event.sourceRollEventId,
+      actionId: event.action.id,
+      actionKind: event.action.kind,
+      ...(event.action.kind === "roll_damage"
+        ? { damageType: event.action.damageType }
+        : {}),
+      ...(event.action.savingThrow
+        ? {
+            spiritualArtsDc: event.character.spiritualArtsDc,
+            savingThrow: event.action.savingThrow,
+          }
+        : {}),
+      ...(event.action.template ? { template: event.action.template } : {}),
+    },
+  };
+}
+
+/** Create an informational action card without constructing or evaluating a Roll. */
+export async function createSavingThrowChatMessage(event) {
+  if (event.action.kind !== "saving_throw" || !event.action.savingThrow) {
+    throw new Error("Rejected invalid save-only Foundry action");
+  }
+
+  const created = await ChatMessage.create(
+    {
+      _id: chatMessageIdForEvent(event.eventId),
+      author: game.user.id,
+      speaker: { alias: game.user.name },
+      flavor: localize("SPIRITUAL_ARTS.Chat.Source"),
+      content: buildActionFlavor(event),
+      flags: actionMessageFlags(event),
+    },
+    { keepId: true },
+  );
+  if (!created) throw new Error("Foundry did not create the save action message");
   return created;
 }
 
@@ -207,31 +256,24 @@ export async function createActionRollChatMessage(event) {
       author: game.user.id,
       speaker: { alias: game.user.name },
       flavor,
-      flags: {
-        ...(prepared.flags ?? {}),
-        [MODULE_ID]: {
-          eventId: event.eventId,
-          protocolVersion: event.protocolVersion,
-          sourceRollEventId: event.sourceRollEventId,
-          actionId: event.action.id,
-          actionKind: event.action.kind,
-          ...(event.action.kind === "roll_damage"
-            ? { damageType: event.action.damageType }
-            : {}),
-          ...(event.action.savingThrow
-            ? {
-                spiritualArtsDc: event.character.spiritualArtsDc,
-                savingThrow: event.action.savingThrow,
-              }
-            : {}),
-          ...(event.action.template
-            ? { template: event.action.template }
-            : {}),
-        },
-      },
+      flags: actionMessageFlags(event, prepared.flags),
     },
     { keepId: true },
   );
   if (!created) throw new Error("Foundry did not create the action roll message");
   return created;
+}
+
+/** Route each validated action to either the native-roll or save-only boundary. */
+export async function createActionChatMessage(event) {
+  if (event.action.kind === "saving_throw") {
+    return createSavingThrowChatMessage(event);
+  }
+  if (
+    event.action.kind === "roll_damage" ||
+    event.action.kind === "roll_healing"
+  ) {
+    return createActionRollChatMessage(event);
+  }
+  throw new Error("Rejected unsupported Foundry action kind");
 }

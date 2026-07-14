@@ -344,14 +344,25 @@ export function parseMeasuredTemplate(value) {
 function parseAction(action) {
   if (!isRecord(action)) return null;
 
-  const required = ["id", "kind", "formula"];
-  const optional = ["label", "savingThrow", "template"];
-  if (action.kind === "roll_damage") required.push("damageType");
-  else if (action.kind !== "roll_healing") return null;
+  const required = ["id", "kind"];
+  const optional = ["label", "template"];
+  if (action.kind === "roll_damage") {
+    required.push("formula", "damageType");
+    optional.push("savingThrow");
+  } else if (action.kind === "roll_healing") {
+    required.push("formula");
+    optional.push("savingThrow");
+  } else if (action.kind === "saving_throw") {
+    required.push("savingThrow");
+  } else {
+    return null;
+  }
 
   if (!hasExactKeys(action, required, optional)) return null;
 
-  const formula = parseSafeRollFormula(action.formula);
+  const formula = Object.hasOwn(action, "formula")
+    ? parseSafeRollFormula(action.formula)
+    : undefined;
   const label = Object.hasOwn(action, "label")
     ? boundedString(action.label, { min: 1, max: 255, trim: true })
     : undefined;
@@ -363,7 +374,7 @@ function parseAction(action) {
     : undefined;
   if (
     !isUuid(action.id) ||
-    formula === null ||
+    (Object.hasOwn(action, "formula") && formula === null) ||
     (Object.hasOwn(action, "label") && label === null) ||
     (Object.hasOwn(action, "savingThrow") && savingThrow === null) ||
     (Object.hasOwn(action, "template") && template === null)
@@ -376,6 +387,14 @@ function parseAction(action) {
     ...(savingThrow === undefined ? {} : { savingThrow }),
     ...(template === undefined ? {} : { template }),
   };
+
+  if (action.kind === "saving_throw") {
+    return {
+      id: action.id,
+      kind: action.kind,
+      ...optionalFields,
+    };
+  }
 
   if (action.kind === "roll_damage") {
     if (!DAMAGE_TYPE_SET.has(action.damageType)) return null;

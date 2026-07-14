@@ -1,7 +1,7 @@
 import { RollBridgeConnection } from "./connection.mjs";
 import { MAX_SEEN_EVENT_IDS, MODULE_ID } from "./constants.mjs";
 import {
-  createActionRollChatMessage,
+  createActionChatMessage,
   createRollChatMessage,
 } from "./chat-message.mjs";
 import { BoundedEventSet } from "./deduplication.mjs";
@@ -58,7 +58,7 @@ export class SpiritualArtsBridge {
     if (event.type === "spirit_die_roll") {
       await createRollChatMessage(event);
     } else if (event.type === "foundry_action_request") {
-      await createActionRollChatMessage(event);
+      await createActionChatMessage(event);
     } else {
       return;
     }
