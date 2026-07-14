@@ -17,8 +17,12 @@ rolled by Foundry Core and are authoritative in Foundry.
 - Each `foundry_action_request` becomes a native Foundry Core roll message. Its
   flavor identifies the website character, technique, action label, and damage
   or healing type.
+- Actions can optionally show the character's Spiritual Arts save DC and target
+  ability. They can also include a button that enters Foundry's standard
+  measured-template preview and placement workflow for the clicking user.
 - No Foundry Actor is selected or changed. There is no automatic damage,
-  healing, targeting, attack roll, saving throw, condition, or active effect.
+  healing, targeting, attack roll, saving-throw roll, condition, or active
+  effect. Placed templates are plain scene documents with no mechanical logic.
 - Duplicate event IDs are suppressed with a bounded in-memory set, existing
   ChatMessage flags, and deterministic 16-character document IDs created with
   `keepId`.
@@ -81,7 +85,8 @@ One action request has this wire shape:
       "name": "Raan",
       "path": "Path of Gluttony",
       "level": 8,
-      "portraitUrl": null
+      "portraitUrl": null,
+      "spiritualArtsDc": 16
     },
     "technique": {
       "id": "89843a7a-b538-4c16-beee-56255e41615e",
@@ -93,7 +98,9 @@ One action request has this wire shape:
       "kind": "roll_damage",
       "formula": "2d8 + 4",
       "damageType": "necrotic",
-      "label": "Essence damage"
+      "label": "Essence damage",
+      "savingThrow": { "ability": "dex" },
+      "template": { "type": "circle", "distance": 20 }
     }
   }
 }
@@ -112,9 +119,31 @@ poison, psychic, radiant, slashing, thunder
 
 Healing actions use `"kind": "roll_healing"` and must omit `damageType`.
 
+`spiritualArtsDc` is optional for rolling-deployment compatibility. When
+present it is an integer from 1 to 100, or `null` when unavailable; omission is
+also displayed as unavailable. A save can target `str`, `dex`, `con`, `int`,
+`wis`, or `cha`; it is informational and does not ask Foundry to roll or target
+tokens. Optional template shapes are:
+
+```json
+{ "type": "circle", "distance": 20 }
+{ "type": "cone", "distance": 30, "angle": 53.13 }
+{ "type": "rectangle", "distance": 15 }
+{ "type": "ray", "distance": 60, "width": 5 }
+```
+
+Distances, ray widths, and cone angles may be decimal numbers. Distances and
+widths are greater than 0 and at most 1,000; angles are greater than 0 and at
+most 360. Circle distance is its radius. Rectangle distance is its square side
+length and is converted to Foundry's diagonal representation. Placing a
+template requires an active scene and the clicking user's `TEMPLATE_CREATE`
+permission; right-click cancels placement.
+
 The action ChatMessage stores these module flags: `eventId`,
 `protocolVersion`, `sourceRollEventId`, `actionId`, `actionKind`, and (for
-damage) `damageType`.
+damage) `damageType`. When configured, it also stores `spiritualArtsDc`,
+`savingThrow`, and `template` so every client can render and execute its local
+chat control.
 
 ## Formula safety
 
@@ -137,7 +166,8 @@ Examples accepted: `2d8 + 4`, `1d6 + 1d4`, `3d10 - 2`.
 The tests exercise strict protocol parsing, formula bounds, bridge-user gating,
 native Roll and ChatMessage boundaries, deterministic IDs and flags, duplicate
 suppression, retryability after failed creation, reconnection-safe event
-handling, and the unchanged Spirit Die renderer.
+handling, measured-template conversion and preview boundaries, and the
+unchanged Spirit Die renderer.
 
 ```powershell
 npm test
@@ -161,9 +191,13 @@ world because Foundry globals are unavailable to Node tests.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
    flavor shows the website character, technique, configured/fallback action
    label, and `Necrotic damage` or `Healing`.
-7. Make a failed Spirit Die roll for the same tier and confirm only the failure
-   card appears—no damage or healing roll should follow.
-8. Sign the bridge user out, make another website roll, then sign back in.
+7. Configure a Dexterity save and 20-foot circle on either roll. Confirm the
+   card displays the character's Spiritual Arts DC and a measured-template
+   button. Click it as a permitted user, place the circle, and confirm it is a
+   plain 20-foot-radius scene template. Right-click should cancel a preview.
+8. Make a failed Spirit Die roll for the same tier and confirm the configured
+   damage/healing actions and controls still follow the failure card.
+9. Sign the bridge user out, make another website roll, then sign back in.
    Confirm the missed events are not replayed.
 
 ## Delivery and security limitations

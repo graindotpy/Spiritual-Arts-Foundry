@@ -130,3 +130,57 @@
   color: #68675f;
   font-size: 0.75rem;
 }
+
+.spiritual-arts-action-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgb(141 107 64 / 24%);
+}
+
+.spiritual-arts-action-save,
+.spiritual-arts-place-template {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  border: 1px solid rgb(38 58 51 / 35%);
+  border-radius: 4px;
+  background: rgb(248 241 228 / 70%);
+  color: #263a33;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.spiritual-arts-action-save {
+  padding: 6px 8px;
+}
+
+.spiritual-arts-action-save span,
+.spiritual-arts-place-template span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.spiritual-arts-place-template {
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.spiritual-arts-place-template:hover:not(:disabled),
+.spiritual-arts-place-template:focus-visible:not(:disabled) {
+  border-color: #8d6b40;
+  box-shadow: 0 0 0 1px rgb(141 107 64 / 20%);
+}
+
+.spiritual-arts-place-template:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}

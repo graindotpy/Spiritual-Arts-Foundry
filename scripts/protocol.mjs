@@ -27,6 +27,22 @@ export const DAMAGE_TYPES = Object.freeze([
   "thunder",
 ]);
 
+export const SAVING_THROW_ABILITIES = Object.freeze([
+  "str",
+  "dex",
+  "con",
+  "int",
+  "wis",
+  "cha",
+]);
+
+export const MEASURED_TEMPLATE_TYPES = Object.freeze([
+  "circle",
+  "cone",
+  "rectangle",
+  "ray",
+]);
+
 export const FORMULA_LIMITS = Object.freeze({
   MAX_LENGTH: 200,
   MAX_TERMS: 50,
@@ -37,6 +53,8 @@ export const FORMULA_LIMITS = Object.freeze({
 });
 
 const DAMAGE_TYPE_SET = new Set(DAMAGE_TYPES);
+const SAVING_THROW_ABILITY_SET = new Set(SAVING_THROW_ABILITIES);
+const MEASURED_TEMPLATE_TYPE_SET = new Set(MEASURED_TEMPLATE_TYPES);
 const ISO_TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 const UUID =
@@ -90,16 +108,10 @@ function parseTimestamp(value) {
     : null;
 }
 
-function parseCharacter(character) {
-  if (
-    !hasExactKeys(character, [
-      "id",
-      "name",
-      "path",
-      "level",
-      "portraitUrl",
-    ])
-  ) {
+function parseCharacter(character, { allowSpiritualArtsDc = false } = {}) {
+  const required = ["id", "name", "path", "level", "portraitUrl"];
+  const optional = allowSpiritualArtsDc ? ["spiritualArtsDc"] : [];
+  if (!hasExactKeys(character, required, optional)) {
     return null;
   }
 
@@ -126,12 +138,27 @@ function parseCharacter(character) {
     (portraitUrl === null && character.portraitUrl !== null) ||
     !Number.isInteger(character.level) ||
     character.level < 1 ||
-    character.level > 20
+    character.level > 20 ||
+    (allowSpiritualArtsDc &&
+      Object.hasOwn(character, "spiritualArtsDc") &&
+      character.spiritualArtsDc !== null &&
+      (!Number.isInteger(character.spiritualArtsDc) ||
+        character.spiritualArtsDc < 1 ||
+        character.spiritualArtsDc > 100))
   ) {
     return null;
   }
 
-  return { id, name, path, level: character.level, portraitUrl };
+  return {
+    id,
+    name,
+    path,
+    level: character.level,
+    portraitUrl,
+    ...(allowSpiritualArtsDc
+      ? { spiritualArtsDc: character.spiritualArtsDc ?? null }
+      : {}),
+  };
 }
 
 /**
@@ -261,11 +288,64 @@ function parseSpiritRollData(data) {
   };
 }
 
+function parseSavingThrow(value) {
+  if (
+    !hasExactKeys(value, ["ability"]) ||
+    !SAVING_THROW_ABILITY_SET.has(value.ability)
+  ) {
+    return null;
+  }
+  return { ability: value.ability };
+}
+
+function isBoundedPositiveNumber(value, maximum) {
+  return Number.isFinite(value) && value > 0 && value <= maximum;
+}
+
+export function parseMeasuredTemplate(value) {
+  if (
+    !isRecord(value) ||
+    !MEASURED_TEMPLATE_TYPE_SET.has(value.type)
+  ) {
+    return null;
+  }
+
+  if (value.type === "cone") {
+    if (
+      !hasExactKeys(value, ["type", "distance", "angle"]) ||
+      !isBoundedPositiveNumber(value.distance, 1_000) ||
+      !isBoundedPositiveNumber(value.angle, 360)
+    ) {
+      return null;
+    }
+    return { type: value.type, distance: value.distance, angle: value.angle };
+  }
+
+  if (value.type === "ray") {
+    if (
+      !hasExactKeys(value, ["type", "distance", "width"]) ||
+      !isBoundedPositiveNumber(value.distance, 1_000) ||
+      !isBoundedPositiveNumber(value.width, 1_000)
+    ) {
+      return null;
+    }
+    return { type: value.type, distance: value.distance, width: value.width };
+  }
+
+  if (
+    !hasExactKeys(value, ["type", "distance"]) ||
+    !isBoundedPositiveNumber(value.distance, 1_000)
+  ) {
+    return null;
+  }
+  return { type: value.type, distance: value.distance };
+}
+
 function parseAction(action) {
   if (!isRecord(action)) return null;
 
   const required = ["id", "kind", "formula"];
-  const optional = ["label"];
+  const optional = ["label", "savingThrow", "template"];
   if (action.kind === "roll_damage") required.push("damageType");
   else if (action.kind !== "roll_healing") return null;
 
@@ -275,13 +355,27 @@ function parseAction(action) {
   const label = Object.hasOwn(action, "label")
     ? boundedString(action.label, { min: 1, max: 255, trim: true })
     : undefined;
+  const savingThrow = Object.hasOwn(action, "savingThrow")
+    ? parseSavingThrow(action.savingThrow)
+    : undefined;
+  const template = Object.hasOwn(action, "template")
+    ? parseMeasuredTemplate(action.template)
+    : undefined;
   if (
     !isUuid(action.id) ||
     formula === null ||
-    (Object.hasOwn(action, "label") && label === null)
+    (Object.hasOwn(action, "label") && label === null) ||
+    (Object.hasOwn(action, "savingThrow") && savingThrow === null) ||
+    (Object.hasOwn(action, "template") && template === null)
   ) {
     return null;
   }
+
+  const optionalFields = {
+    ...(label === undefined ? {} : { label }),
+    ...(savingThrow === undefined ? {} : { savingThrow }),
+    ...(template === undefined ? {} : { template }),
+  };
 
   if (action.kind === "roll_damage") {
     if (!DAMAGE_TYPE_SET.has(action.damageType)) return null;
@@ -290,7 +384,7 @@ function parseAction(action) {
       kind: action.kind,
       formula,
       damageType: action.damageType,
-      ...(label === undefined ? {} : { label }),
+      ...optionalFields,
     };
   }
 
@@ -298,7 +392,7 @@ function parseAction(action) {
     id: action.id,
     kind: action.kind,
     formula,
-    ...(label === undefined ? {} : { label }),
+    ...optionalFields,
   };
 }
 
@@ -317,7 +411,9 @@ function parseFoundryActionData(data) {
   }
 
   const requestedAt = parseTimestamp(data.requestedAt);
-  const character = parseCharacter(data.character);
+  const character = parseCharacter(data.character, {
+    allowSpiritualArtsDc: true,
+  });
   const action = parseAction(data.action);
   const techniqueName = isRecord(data.technique)
     ? boundedString(data.technique.name, { min: 1, max: 255, trim: true })

@@ -11,8 +11,10 @@ import {
 } from "../scripts/protocol.mjs";
 import {
   serializedActionMessage,
+  serializedLegacyActionMessage,
   serializedMessage,
   validDamageActionMessage,
+  validEnhancedDamageActionMessage,
   validMessage,
 } from "./fixtures.mjs";
 
@@ -66,6 +68,47 @@ test("parses valid damage and healing action requests as a discriminated union",
   }
 });
 
+test("parses bounded saving throws and all measured template shapes", () => {
+  const enhanced = parseFoundryActionMessage(
+    JSON.stringify(validEnhancedDamageActionMessage),
+  );
+  assert.equal(enhanced?.character.spiritualArtsDc, 16);
+  assert.deepEqual(enhanced?.action.savingThrow, { ability: "dex" });
+  assert.deepEqual(enhanced?.action.template, {
+    type: "circle",
+    distance: 20,
+  });
+
+  const templates = [
+    { type: "circle", distance: 0.5 },
+    { type: "cone", distance: 30, angle: 53.13 },
+    { type: "rectangle", distance: 15.5 },
+    { type: "ray", distance: 1000, width: 5 },
+  ];
+  for (const template of templates) {
+    const message = structuredClone(validEnhancedDamageActionMessage);
+    message.data.action.template = template;
+    assert.deepEqual(
+      parseFoundryActionMessage(JSON.stringify(message))?.action.template,
+      template,
+    );
+  }
+
+  const unavailableDc = structuredClone(validEnhancedDamageActionMessage);
+  unavailableDc.data.character.spiritualArtsDc = null;
+  assert.equal(
+    parseFoundryActionMessage(JSON.stringify(unavailableDc))?.character
+      .spiritualArtsDc,
+    null,
+  );
+});
+
+test("accepts legacy action characters without a Spiritual Arts DC", () => {
+  const legacy = parseFoundryActionMessage(serializedLegacyActionMessage());
+  assert.equal(legacy?.type, "foundry_action_request");
+  assert.equal(legacy?.character.spiritualArtsDc, null);
+});
+
 test("rejects unversioned, future-version, invalid-ID, and unknown envelopes", () => {
   const unversioned = structuredClone(validMessage);
   delete unversioned.protocolVersion;
@@ -102,6 +145,10 @@ test("rejects malformed, oversized, and internally inconsistent Spirit Die rolls
   const extraCharacterField = structuredClone(validMessage);
   extraCharacterField.data.character.actorId = "not-supported";
   assert.equal(parseRealtimeMessage(JSON.stringify(extraCharacterField)), null);
+
+  const actionOnlyDc = structuredClone(validMessage);
+  actionOnlyDc.data.character.spiritualArtsDc = 16;
+  assert.equal(parseRealtimeMessage(JSON.stringify(actionOnlyDc)), null);
 });
 
 test("accepts only the bounded phase-one formula grammar", () => {
@@ -211,6 +258,38 @@ test("rejects invalid action kinds, damage typing, labels, and nested fields", (
   const extraDataField = structuredClone(validDamageActionMessage);
   extraDataField.data.macro = "forbidden";
   cases.push(extraDataField);
+
+  for (const spiritualArtsDc of [0, 101, 12.5, "16"]) {
+    const invalidDc = structuredClone(validDamageActionMessage);
+    invalidDc.data.character.spiritualArtsDc = spiritualArtsDc;
+    cases.push(invalidDc);
+  }
+
+  for (const ability of ["", "Dex", "dexterity", "save"]) {
+    const invalidSave = structuredClone(validDamageActionMessage);
+    invalidSave.data.action.savingThrow = { ability };
+    cases.push(invalidSave);
+  }
+
+  const extraSaveField = structuredClone(validDamageActionMessage);
+  extraSaveField.data.action.savingThrow = { ability: "dex", dc: 16 };
+  cases.push(extraSaveField);
+
+  for (const template of [
+    { type: "sphere", distance: 20 },
+    { type: "circle", distance: 0 },
+    { type: "circle", distance: 1000.1 },
+    { type: "circle", distance: Number.NaN },
+    { type: "cone", distance: 30 },
+    { type: "cone", distance: 30, angle: 360.1 },
+    { type: "rectangle", distance: 20, width: 10 },
+    { type: "ray", distance: 60 },
+    { type: "ray", distance: 60, width: 0 },
+  ]) {
+    const invalidTemplate = structuredClone(validDamageActionMessage);
+    invalidTemplate.data.action.template = template;
+    cases.push(invalidTemplate);
+  }
 
   for (const actionEvent of cases) {
     assert.equal(

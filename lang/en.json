@@ -11,5 +11,18 @@
   "SPIRITUAL_ARTS.Chat.DamageRoll": "Damage roll",
   "SPIRITUAL_ARTS.Chat.HealingRoll": "Healing roll",
   "SPIRITUAL_ARTS.Chat.DamageType": "{type} damage",
-  "SPIRITUAL_ARTS.Chat.Healing": "Healing"
+  "SPIRITUAL_ARTS.Chat.Healing": "Healing",
+  "SPIRITUAL_ARTS.Chat.Ability.str": "STRENGTH",
+  "SPIRITUAL_ARTS.Chat.Ability.dex": "DEXTERITY",
+  "SPIRITUAL_ARTS.Chat.Ability.con": "CONSTITUTION",
+  "SPIRITUAL_ARTS.Chat.Ability.int": "INTELLIGENCE",
+  "SPIRITUAL_ARTS.Chat.Ability.wis": "WISDOM",
+  "SPIRITUAL_ARTS.Chat.Ability.cha": "CHARISMA",
+  "SPIRITUAL_ARTS.Chat.SavingThrow": "DC {dc} {ability} SAVING THROW",
+  "SPIRITUAL_ARTS.Chat.SavingThrowUnavailable": "DC unavailable · {ability} SAVING THROW",
+  "SPIRITUAL_ARTS.Chat.PlaceMeasuredTemplate": "PLACE MEASURED TEMPLATE",
+  "SPIRITUAL_ARTS.Chat.TemplateRequiresScene": "Open an active scene before placing this measured template.",
+  "SPIRITUAL_ARTS.Chat.TemplatePermissionDenied": "You do not have permission to create measured templates.",
+  "SPIRITUAL_ARTS.Chat.TemplateUnavailable": "Measured template placement is unavailable in this world.",
+  "SPIRITUAL_ARTS.Chat.TemplatePlacementFailed": "Failed to place the Spiritual Arts measured template."
 }

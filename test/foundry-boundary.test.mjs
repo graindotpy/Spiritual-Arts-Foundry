@@ -20,7 +20,7 @@ import {
 import {
   serializedActionMessage,
   serializedMessage,
-  validDamageActionMessage,
+  validEnhancedDamageActionMessage,
 } from "./fixtures.mjs";
 
 function installGame({ selectedUserId = "bridge-user" } = {}) {
@@ -102,7 +102,7 @@ test("creates a generic chat message authored by the designated user", async () 
 
 test("evaluates and creates an action as a native Foundry v12 roll message", async () => {
   installGame();
-  const actionMessage = structuredClone(validDamageActionMessage);
+  const actionMessage = structuredClone(validEnhancedDamageActionMessage);
   actionMessage.data.character.name = "Raan <script>alert(1)</script>";
   actionMessage.data.action.label = "Essence <b>damage</b>";
   const event = parseFoundryActionMessage(JSON.stringify(actionMessage));
@@ -158,13 +158,33 @@ test("evaluates and creates an action as a native Foundry v12 roll message", asy
     actionId: event.action.id,
     actionKind: "roll_damage",
     damageType: "necrotic",
+    spiritualArtsDc: 16,
+    savingThrow: { ability: "dex" },
+    template: { type: "circle", distance: 20 },
   });
   assert.deepEqual(created.options, { keepId: true });
   assert.match(created.data.flavor, /Necrotic/);
   assert.doesNotMatch(created.data.flavor, /<script>/);
   assert.doesNotMatch(created.data.flavor, /<b>damage/);
   assert.match(created.data.flavor, /&lt;script&gt;/);
+  assert.match(created.data.flavor, /SavingThrow/);
+  assert.match(created.data.flavor, /16/);
+  assert.match(created.data.flavor, /place-spiritual-arts-template/);
   assert.equal(buildActionFlavor(event), created.data.flavor);
+});
+
+test("renders an unavailable DC when a configured save has a null or omitted character DC", () => {
+  installGame();
+  for (const omitDc of [false, true]) {
+    const actionMessage = structuredClone(validEnhancedDamageActionMessage);
+    if (omitDc) delete actionMessage.data.character.spiritualArtsDc;
+    else actionMessage.data.character.spiritualArtsDc = null;
+    const event = parseFoundryActionMessage(JSON.stringify(actionMessage));
+    const flavor = buildActionFlavor(event);
+
+    assert.match(flavor, /SavingThrowUnavailable/);
+    assert.doesNotMatch(flavor, /\"dc\"/);
+  }
 });
 
 test("requires Foundry's Roll validator in addition to protocol validation", async () => {

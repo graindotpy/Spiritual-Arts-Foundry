@@ -37,7 +37,10 @@ export const validDamageActionMessage = Object.freeze({
   data: {
     requestedAt: "2026-07-13T12:00:00.100Z",
     sourceRollEventId: validMessage.eventId,
-    character: structuredClone(validMessage.data.character),
+    character: {
+      ...structuredClone(validMessage.data.character),
+      spiritualArtsDc: 16,
+    },
     technique: {
       id: "89843a7a-b538-4c16-beee-56255e41615e",
       name: "Devour Essence",
@@ -53,9 +56,27 @@ export const validDamageActionMessage = Object.freeze({
   },
 });
 
+export const validEnhancedDamageActionMessage = Object.freeze({
+  ...structuredClone(validDamageActionMessage),
+  data: {
+    ...structuredClone(validDamageActionMessage.data),
+    action: {
+      ...structuredClone(validDamageActionMessage.data.action),
+      savingThrow: { ability: "dex" },
+      template: { type: "circle", distance: 20 },
+    },
+  },
+});
+
 export function serializedActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validDamageActionMessage),
     ...update,
   });
+}
+
+export function serializedLegacyActionMessage() {
+  const message = structuredClone(validDamageActionMessage);
+  delete message.data.character.spiritualArtsDc;
+  return JSON.stringify(message);
 }

@@ -5,7 +5,7 @@
   "description": "Foundry VTT v12 bridge for Spiritual Arts website rolls",
   "type": "module",
   "scripts": {
-    "test": "node --test test/protocol.test.mjs test/deduplication.test.mjs test/connection.test.mjs test/foundry-boundary.test.mjs test/bridge.test.mjs"
+    "test": "node --test test/protocol.test.mjs test/deduplication.test.mjs test/connection.test.mjs test/foundry-boundary.test.mjs test/bridge.test.mjs test/template-placement.test.mjs"
   },
   "engines": {
     "node": ">=20"

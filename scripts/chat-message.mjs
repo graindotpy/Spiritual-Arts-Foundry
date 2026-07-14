@@ -75,6 +75,45 @@ function titleCase(value) {
   return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
+function savingThrowHtml(event) {
+  if (!event.action.savingThrow) return "";
+  const dcUnavailable =
+    event.character.spiritualArtsDc === null ||
+    event.character.spiritualArtsDc === undefined;
+  const ability = localize(
+    `SPIRITUAL_ARTS.Chat.Ability.${event.action.savingThrow.ability}`,
+  );
+  const label = localize(
+    dcUnavailable
+      ? "SPIRITUAL_ARTS.Chat.SavingThrowUnavailable"
+      : "SPIRITUAL_ARTS.Chat.SavingThrow",
+    {
+      ability,
+      ...(dcUnavailable
+        ? {}
+        : { dc: event.character.spiritualArtsDc }),
+    },
+  );
+  return [
+    '<div class="spiritual-arts-action-save">',
+    '<i class="fa-solid fa-shield-halved" aria-hidden="true"></i>',
+    `<span>${escapeHtml(label)}</span>`,
+    "</div>",
+  ].join("");
+}
+
+function measuredTemplateButtonHtml(event) {
+  if (!event.action.template) return "";
+  const label = localize("SPIRITUAL_ARTS.Chat.PlaceMeasuredTemplate");
+  return [
+    '<button type="button" class="spiritual-arts-place-template" ',
+    'data-action="place-spiritual-arts-template">',
+    '<i class="fa-solid fa-bullseye" aria-hidden="true"></i>',
+    `<span>${escapeHtml(label)}</span>`,
+    "</button>",
+  ].join("");
+}
+
 export function buildActionFlavor(event) {
   const isDamage = event.action.kind === "roll_damage";
   const actionLabel =
@@ -89,12 +128,17 @@ export function buildActionFlavor(event) {
         type: titleCase(event.action.damageType),
       })
     : localize("SPIRITUAL_ARTS.Chat.Healing");
+  const savingThrow = savingThrowHtml(event);
+  const measuredTemplateButton = measuredTemplateButtonHtml(event);
 
   return [
     '<div class="spiritual-arts-action-flavor">',
     `<strong>${escapeHtml(actionLabel)}</strong>`,
     `<span>${escapeHtml(event.character.name)} &middot; ${escapeHtml(event.technique.name)}</span>`,
     `<span>${escapeHtml(rollType)}</span>`,
+    savingThrow || measuredTemplateButton
+      ? `<div class="spiritual-arts-action-controls">${savingThrow}${measuredTemplateButton}</div>`
+      : "",
     "</div>",
   ].join("");
 }
@@ -173,6 +217,15 @@ export async function createActionRollChatMessage(event) {
           actionKind: event.action.kind,
           ...(event.action.kind === "roll_damage"
             ? { damageType: event.action.damageType }
+            : {}),
+          ...(event.action.savingThrow
+            ? {
+                spiritualArtsDc: event.character.spiritualArtsDc,
+                savingThrow: event.action.savingThrow,
+              }
+            : {}),
+          ...(event.action.template
+            ? { template: event.action.template }
             : {}),
         },
       },
