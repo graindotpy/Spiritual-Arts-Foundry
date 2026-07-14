@@ -102,6 +102,21 @@ export const validAttackActionMessage = Object.freeze({
   },
 });
 
+export const validTemplateActionMessage = Object.freeze({
+  ...structuredClone(validDamageActionMessage),
+  eventId: "2491ed4a-4a2c-4983-bec6-5a1385211e7c",
+  data: {
+    ...structuredClone(validDamageActionMessage.data),
+    character: structuredClone(validMessage.data.character),
+    action: {
+      id: "8d92240a-54ec-43f8-9bce-c7211aee5970",
+      kind: "place_template",
+      label: "Create difficult terrain",
+      template: { type: "rectangle", distance: 20 },
+    },
+  },
+});
+
 export function serializedActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validDamageActionMessage),
@@ -119,6 +134,13 @@ export function serializedSavingThrowActionMessage(update = {}) {
 export function serializedAttackActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validAttackActionMessage),
+    ...update,
+  });
+}
+
+export function serializedTemplateActionMessage(update = {}) {
+  return JSON.stringify({
+    ...structuredClone(validTemplateActionMessage),
     ...update,
   });
 }

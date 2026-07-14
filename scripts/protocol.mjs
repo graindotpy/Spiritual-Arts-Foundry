@@ -379,6 +379,8 @@ function parseAction(action) {
   } else if (action.kind === "saving_throw") {
     required.push("savingThrow");
     optional.push("template");
+  } else if (action.kind === "place_template") {
+    required.push("template");
   } else if (action.kind !== "roll_attack") {
     return null;
   }
@@ -413,7 +415,11 @@ function parseAction(action) {
     ...(template === undefined ? {} : { template }),
   };
 
-  if (action.kind === "saving_throw" || action.kind === "roll_attack") {
+  if (
+    action.kind === "saving_throw" ||
+    action.kind === "roll_attack" ||
+    action.kind === "place_template"
+  ) {
     return {
       id: action.id,
       kind: action.kind,

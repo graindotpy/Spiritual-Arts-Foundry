@@ -124,6 +124,7 @@ export function buildActionFlavor(event) {
   const isDamage = event.action.kind === "roll_damage";
   const isHealing = event.action.kind === "roll_healing";
   const isAttack = event.action.kind === "roll_attack";
+  const isTemplate = event.action.kind === "place_template";
   const actionLabel =
     event.action.label ??
     localize(
@@ -133,7 +134,9 @@ export function buildActionFlavor(event) {
           ? "SPIRITUAL_ARTS.Chat.HealingRoll"
           : isAttack
             ? "SPIRITUAL_ARTS.Chat.AttackRoll"
-            : "SPIRITUAL_ARTS.Chat.SavingThrowAction",
+            : isTemplate
+              ? "SPIRITUAL_ARTS.Chat.MeasuredTemplateAction"
+              : "SPIRITUAL_ARTS.Chat.SavingThrowAction",
     );
   const rollType = isDamage
     ? localize("SPIRITUAL_ARTS.Chat.DamageType", {
@@ -242,6 +245,29 @@ export async function createSavingThrowChatMessage(event) {
   return created;
 }
 
+/** Create an informational template card without constructing or evaluating a Roll. */
+export async function createTemplateChatMessage(event) {
+  if (event.action.kind !== "place_template" || !event.action.template) {
+    throw new Error("Rejected invalid template-only Foundry action");
+  }
+
+  const created = await ChatMessage.create(
+    {
+      _id: chatMessageIdForEvent(event.eventId),
+      author: game.user.id,
+      speaker: { alias: game.user.name },
+      flavor: localize("SPIRITUAL_ARTS.Chat.Source"),
+      content: buildActionFlavor(event),
+      flags: actionMessageFlags(event),
+    },
+    { keepId: true },
+  );
+  if (!created) {
+    throw new Error("Foundry did not create the template action message");
+  }
+  return created;
+}
+
 /** Create an informational card when the website could not derive an attack modifier. */
 export async function createUnavailableAttackChatMessage(event) {
   if (
@@ -333,6 +359,9 @@ export async function createActionRollChatMessage(event) {
 export async function createActionChatMessage(event) {
   if (event.action.kind === "saving_throw") {
     return createSavingThrowChatMessage(event);
+  }
+  if (event.action.kind === "place_template") {
+    return createTemplateChatMessage(event);
   }
   if (event.action.kind === "roll_attack") {
     return event.character.spiritualArtsAttackModifier === null ||

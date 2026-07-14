@@ -7,8 +7,9 @@ Foundry chat. It targets Foundry VTT 12 and Dungeons & Dragons Fifth Edition
 
 Spirit Die results remain authoritative on the website. Phase one also lets the
 website request tightly constrained Spiritual Arts attack, damage, and healing
-rolls, plus informational saving throws that do not need attached dice.
-Requested dice are rolled by Foundry Core and are authoritative in Foundry.
+rolls, plus informational saving throws and measured templates that do not need
+attached dice. Requested dice are rolled by Foundry Core and are authoritative
+in Foundry.
 
 ## Behaviour
 
@@ -27,6 +28,9 @@ Requested dice are rolled by Foundry Core and are authoritative in Foundry.
 - A save-only request becomes a normal non-roll ChatMessage card. It shows the
   informational DC and target ability and can carry the same optional measured
   template control without constructing or evaluating a Foundry `Roll`.
+- A template-only request becomes a normal non-roll ChatMessage card with a
+  measured-template placement control. It has no damage roll, saving throw, or
+  DC display.
 - Roll actions can optionally show the character's Spiritual Arts save DC and
   target ability; save-only actions always do. Either kind can include a button
   that enters Foundry's standard measured-template preview and placement
@@ -91,7 +95,8 @@ Because the parser uses a strict field allowlist, install and reload this
 updated Foundry module before deploying website versions that send newly added
 fields or action kinds. The updated module remains compatible with older
 website events; a pre-update module will discard events containing
-`investmentEffect` or `roll_attack` data it does not recognise.
+`investmentEffect`, `roll_attack`, or `place_template` data it does not
+recognise.
 
 One action request has this wire shape:
 
@@ -156,9 +161,24 @@ A saving throw with no attached dice uses this strict action shape:
 ```
 
 For `saving_throw`, `savingThrow` is required, `label` and `template` are
-optional, and `formula` and `damageType` are rejected. Consequently every
-accepted action specifies dice, a saving throw, or both; a template by itself
-is not an action.
+optional, and `formula` and `damageType` are rejected.
+
+A measured template with no attached dice or saving throw uses this strict
+action shape:
+
+```json
+{
+  "id": "8d92240a-54ec-43f8-9bce-c7211aee5970",
+  "kind": "place_template",
+  "label": "Create difficult terrain",
+  "template": { "type": "rectangle", "distance": 20 }
+}
+```
+
+For `place_template`, `template` is required and `label` is optional.
+`formula`, `damageType`, and `savingThrow` are rejected. It creates only an
+informational card and placement button; placing the resulting plain scene
+template does not apply terrain rules or any other mechanics.
 
 A Spiritual Arts attack uses this strict action shape:
 
@@ -210,7 +230,8 @@ render and execute its local chat control.
 For damage and healing actions, the module independently enforces the phase-one
 grammar before also calling Foundry Core's `Roll.validate`. Attack formulas are
 constructed from the validated modifier and pass through the same Foundry
-validator. Save-only and unavailable-attack actions do not call the Roll API:
+validator. Save-only, template-only, and unavailable-attack actions do not call
+the Roll API:
 
 - A formula is at most 200 characters before trimming and at most 50 terms.
 - A term is an unsigned integer or `NdM` dice term. Terms may be joined only by
@@ -247,13 +268,15 @@ Foundry v12 world because Foundry globals are unavailable to Node tests.
    errors. A different logged-in Foundry user should remain inactive.
 3. On the website, use a character-owned technique whose selected SP tier has
    one attack action, one damage action (`2d8 + 4`, `necrotic`), one healing
-   action (`1d6`), and one save-only action with no formula.
+   action (`1d6`), one save-only action with no formula, and one template-only
+   difficult-terrain action.
 4. Make a Spirit Die roll for that technique and exact SP tier; either a
    success or failure triggers its actions.
 5. Confirm Foundry chat shows the Spirit Die card followed by three separate
-   native roll messages plus a plain save-only card authored by the selected
-   bridge user. Expand the Spirit Die card's investment-effect section and
-   confirm it shows the description from the exact SP tier that was cast.
+   native roll messages plus separate plain save-only and template-only cards
+   authored by the selected bridge user. Expand the Spirit Die card's
+   investment-effect section and confirm it shows the description from the
+   exact SP tier that was cast.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
    flavor shows the website character, technique, configured/fallback action
    label, with `Spiritual Arts attack`, `Necrotic damage`, or `Healing` as the
@@ -264,12 +287,15 @@ Foundry v12 world because Foundry globals are unavailable to Node tests.
    plain 20-foot-radius scene template. Right-click should cancel a preview.
    Confirm the save-only card displays its configured ability and optional
    template in the same way, but contains no dice result or tooltip.
-8. Repeat the attack with an unavailable website modifier. Confirm Foundry
+8. Confirm the template-only card shows its configured label and placement
+   button, but no DC, saving throw, dice result, or tooltip. Place it and confirm
+   it creates the expected plain scene template without terrain automation.
+9. Repeat the attack with an unavailable website modifier. Confirm Foundry
    creates a non-roll card saying `Attack modifier unavailable` and does not
    show a dice result.
-9. Make a failed Spirit Die roll for the same tier and confirm all configured
+10. Make a failed Spirit Die roll for the same tier and confirm all configured
    actions and controls still follow the failure card.
-10. Sign the bridge user out, make another website roll, then sign back in.
+11. Sign the bridge user out, make another website roll, then sign back in.
    Confirm the missed events are not replayed.
 
 ## Delivery and security limitations

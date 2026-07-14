@@ -7,6 +7,7 @@ import {
   serializedActionMessage,
   serializedAttackActionMessage,
   serializedSavingThrowActionMessage,
+  serializedTemplateActionMessage,
 } from "./fixtures.mjs";
 
 function installGame({ currentUserId = "bridge-user" } = {}) {
@@ -85,6 +86,33 @@ test("routes save-only actions directly to ChatMessage creation", async () => {
   assert.equal(
     game.messages[0].getFlag(MODULE_ID, "actionKind"),
     "saving_throw",
+  );
+});
+
+test("routes template-only actions directly to retryable ChatMessage creation", async (t) => {
+  t.mock.method(console, "error", () => {});
+  installGame();
+  const calls = installRollBoundary({ failCreationOnce: true });
+  const event = parseFoundryActionMessage(serializedTemplateActionMessage());
+  const bridge = new SpiritualArtsBridge();
+
+  bridge.connection.onEvent(event);
+  await bridge.queue;
+  assert.equal(bridge.seen.has(event.eventId), false);
+  assert.equal(game.messages.length, 0);
+
+  bridge.connection.onEvent(event);
+  await bridge.queue;
+  assert.equal(bridge.seen.has(event.eventId), true);
+  assert.equal(game.messages.length, 1);
+  assert.deepEqual(calls, { validate: 0, evaluate: 0, create: 2 });
+  assert.equal(
+    game.messages[0].getFlag(MODULE_ID, "actionKind"),
+    "place_template",
+  );
+  assert.deepEqual(
+    game.messages[0].getFlag(MODULE_ID, "template"),
+    { type: "rectangle", distance: 20 },
   );
 });
 

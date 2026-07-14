@@ -6,6 +6,7 @@ import {
   serializedAttackActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
+  serializedTemplateActionMessage,
 } from "./fixtures.mjs";
 
 class FakeWebSocket {
@@ -56,8 +57,9 @@ test("delivers only valid live messages while connected", () => {
   socket.emitMessage(serializedActionMessage());
   socket.emitMessage(serializedSavingThrowActionMessage());
   socket.emitMessage(serializedAttackActionMessage());
+  socket.emitMessage(serializedTemplateActionMessage());
 
-  assert.equal(events.length, 4);
+  assert.equal(events.length, 5);
   assert.equal(events[0].type, "spirit_die_roll");
   assert.equal(events[0].character.name, "Raan");
   assert.equal(events[1].type, "foundry_action_request");
@@ -66,6 +68,8 @@ test("delivers only valid live messages while connected", () => {
   assert.equal(events[2].action.kind, "saving_throw");
   assert.equal(events[3].type, "foundry_action_request");
   assert.equal(events[3].action.kind, "roll_attack");
+  assert.equal(events[4].type, "foundry_action_request");
+  assert.equal(events[4].action.kind, "place_template");
 
   connection.stop();
   assert.equal(socket.closed, true);

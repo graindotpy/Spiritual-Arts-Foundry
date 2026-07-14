@@ -18,11 +18,13 @@ import {
   serializedLegacyActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
+  serializedTemplateActionMessage,
   validDamageActionMessage,
   validAttackActionMessage,
   validEnhancedDamageActionMessage,
   validMessage,
   validSavingThrowActionMessage,
+  validTemplateActionMessage,
 } from "./fixtures.mjs";
 
 test("parses a version-one Spiritual Arts roll without changing its data", () => {
@@ -126,6 +128,38 @@ test("parses a save-only action without a formula or damage type", () => {
       id: withoutTemplate.data.action.id,
       kind: "saving_throw",
       savingThrow: { ability: "str" },
+    },
+  );
+});
+
+test("parses a template-only action without dice or a saving throw", () => {
+  const templateAction = parseFoundryActionMessage(
+    serializedTemplateActionMessage(),
+  );
+
+  assert.equal(templateAction?.action.kind, "place_template");
+  assert.equal(templateAction?.action.label, "Create difficult terrain");
+  assert.deepEqual(templateAction?.action.template, {
+    type: "rectangle",
+    distance: 20,
+  });
+  assert.equal(Object.hasOwn(templateAction.action, "formula"), false);
+  assert.equal(Object.hasOwn(templateAction.action, "damageType"), false);
+  assert.equal(Object.hasOwn(templateAction.action, "savingThrow"), false);
+  assert.equal(
+    Object.hasOwn(validTemplateActionMessage.data.character, "spiritualArtsDc"),
+    false,
+  );
+  assert.equal(templateAction.character.spiritualArtsDc, null);
+
+  const withoutLabel = structuredClone(validTemplateActionMessage);
+  delete withoutLabel.data.action.label;
+  assert.deepEqual(
+    parseFoundryActionMessage(JSON.stringify(withoutLabel))?.action,
+    {
+      id: withoutLabel.data.action.id,
+      kind: "place_template",
+      template: { type: "rectangle", distance: 20 },
     },
   );
 });
@@ -341,6 +375,24 @@ test("rejects invalid action kinds, damage typing, labels, and nested fields", (
   const savingThrowWithoutSave = structuredClone(validSavingThrowActionMessage);
   delete savingThrowWithoutSave.data.action.savingThrow;
   cases.push(savingThrowWithoutSave);
+
+  const templateActionWithoutTemplate = structuredClone(
+    validTemplateActionMessage,
+  );
+  delete templateActionWithoutTemplate.data.action.template;
+  cases.push(templateActionWithoutTemplate);
+
+  for (const [field, value] of [
+    ["formula", "1d20"],
+    ["damageType", "force"],
+    ["savingThrow", { ability: "wis" }],
+  ]) {
+    const mechanicallyEnhancedTemplate = structuredClone(
+      validTemplateActionMessage,
+    );
+    mechanicallyEnhancedTemplate.data.action[field] = value;
+    cases.push(mechanicallyEnhancedTemplate);
+  }
 
   const unsafeFormula = structuredClone(validDamageActionMessage);
   unsafeFormula.data.action.formula = "@abilities.str.mod + 1d8";

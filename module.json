@@ -2,7 +2,7 @@
   "id": "spiritual-arts-foundry",
   "type": "module",
   "title": "Spiritual Arts Roll Bridge",
-  "description": "Displays Spirit Die results and executes validated Spiritual Arts attack, damage, healing, or save-only actions in Foundry VTT chat.",
+  "description": "Displays Spirit Die results and executes validated Spiritual Arts roll, save-only, or measured-template actions in Foundry VTT chat.",
   "version": "0.1.0",
   "authors": [
     {

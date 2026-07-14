@@ -25,6 +25,7 @@ import {
   validAttackActionMessage,
   validEnhancedDamageActionMessage,
   validSavingThrowActionMessage,
+  validTemplateActionMessage,
 } from "./fixtures.mjs";
 
 function installGame({ selectedUserId = "bridge-user" } = {}) {
@@ -248,6 +249,64 @@ test("creates a save-only action card without using Foundry's Roll API", async (
     template: { type: "cone", distance: 15, angle: 90 },
   });
   assert.deepEqual(created.options, { keepId: true });
+});
+
+test("creates a template-only action card without a roll or save", async () => {
+  installGame();
+  const event = parseFoundryActionMessage(
+    JSON.stringify(validTemplateActionMessage),
+  );
+  const calls = [];
+
+  globalThis.Roll = class UnexpectedRoll {
+    static validate() {
+      calls.push("validate");
+      return true;
+    }
+
+    constructor() {
+      calls.push("construct");
+    }
+  };
+  globalThis.ChatMessage = {
+    create: async (data, options) => {
+      calls.push("create");
+      return { data, options };
+    },
+  };
+
+  const created = await createActionChatMessage(event);
+
+  assert.deepEqual(calls, ["create"]);
+  assert.equal(created.data._id, chatMessageIdForEvent(event.eventId));
+  assert.equal(Object.hasOwn(created.data, "rolls"), false);
+  assert.equal(
+    Object.hasOwn(validTemplateActionMessage.data.character, "spiritualArtsDc"),
+    false,
+  );
+  assert.match(created.data.content, /Create difficult terrain/);
+  assert.match(created.data.content, /place-spiritual-arts-template/);
+  assert.doesNotMatch(created.data.content, /SavingThrow/);
+  assert.doesNotMatch(created.data.content, /action-save/);
+  assert.deepEqual(created.data.flags["spiritual-arts-foundry"], {
+    eventId: event.eventId,
+    protocolVersion: 1,
+    sourceRollEventId: event.sourceRollEventId,
+    actionId: event.action.id,
+    actionKind: "place_template",
+    template: { type: "rectangle", distance: 20 },
+  });
+  assert.deepEqual(created.options, { keepId: true });
+
+  const unlabeledMessage = structuredClone(validTemplateActionMessage);
+  delete unlabeledMessage.data.action.label;
+  const unlabeledEvent = parseFoundryActionMessage(
+    JSON.stringify(unlabeledMessage),
+  );
+  assert.match(
+    buildActionFlavor(unlabeledEvent),
+    /SPIRITUAL_ARTS\.Chat\.MeasuredTemplateAction/,
+  );
 });
 
 test("derives and evaluates Spiritual Arts attacks as native Foundry rolls", async () => {
