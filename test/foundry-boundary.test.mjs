@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   buildActionFlavor,
@@ -88,6 +89,14 @@ test("creates a generic chat message authored by the designated user", async () 
   const context = buildRollMessageContext(event);
   assert.equal(context.characterName, "Raan");
   assert.equal(context.value, 6);
+  assert.equal(
+    context.investmentEffect,
+    "Deal necrotic damage.\nThen regain Hit Points from the consumed essence.",
+  );
+  assert.equal(
+    context.investmentEffectLabel,
+    'SPIRITUAL_ARTS.Chat.InvestmentEffect:{"sp":2}',
+  );
 
   const created = await createRollChatMessage(event);
   assert.equal(created.data._id, chatMessageIdForEvent(event.eventId));
@@ -100,6 +109,22 @@ test("creates a generic chat message authored by the designated user", async () 
   );
   assert.deepEqual(created.options, { keepId: true });
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].context.investmentEffect, context.investmentEffect);
+});
+
+test("keeps the investment effect collapsed and Handlebars-escaped", () => {
+  const template = readFileSync(
+    new URL("../templates/roll-message.hbs", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(template, /<details class="spiritual-arts-roll__investment">/);
+  assert.doesNotMatch(
+    template,
+    /<details class="spiritual-arts-roll__investment"[^>]*\sopen(?:\s|>|=)/,
+  );
+  assert.match(template, /\{\{investmentEffect\}\}/);
+  assert.doesNotMatch(template, /\{\{\{investmentEffect\}\}\}/);
 });
 
 test("evaluates and creates an action as a native Foundry v12 roll message", async () => {

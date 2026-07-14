@@ -1,4 +1,5 @@
 import {
+  MAX_INVESTMENT_EFFECT_LENGTH,
   MAX_WEBSOCKET_MESSAGE_LENGTH,
   PROTOCOL_VERSION,
 } from "./constants.mjs";
@@ -238,7 +239,7 @@ function parseSpiritRollData(data) {
         "success",
         "timestamp",
       ],
-      ["techniqueId", "techniqueName"],
+      ["techniqueId", "techniqueName", "investmentEffect"],
     )
   ) {
     return null;
@@ -264,10 +265,15 @@ function parseSpiritRollData(data) {
 
   const techniqueId = nullableString(roll.techniqueId, 255);
   const techniqueName = nullableString(roll.techniqueName, 255);
+  const investmentEffect = nullableString(
+    roll.investmentEffect,
+    MAX_INVESTMENT_EFFECT_LENGTH,
+  );
   const timestamp = parseTimestamp(roll.timestamp);
   if (
     !isValidNullableString(roll.techniqueId, techniqueId) ||
     !isValidNullableString(roll.techniqueName, techniqueName) ||
+    !isValidNullableString(roll.investmentEffect, investmentEffect) ||
     timestamp === null
   ) {
     return null;
@@ -283,6 +289,7 @@ function parseSpiritRollData(data) {
       success: roll.success,
       techniqueId,
       techniqueName,
+      investmentEffect,
       timestamp,
     },
   };

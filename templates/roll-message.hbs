@@ -22,6 +22,13 @@
     <span class="spiritual-arts-roll__outcome">{{outcome}}</span>
   </div>
 
+  {{#if investmentEffect}}
+    <details class="spiritual-arts-roll__investment">
+      <summary>{{investmentEffectLabel}}</summary>
+      <div class="spiritual-arts-roll__investment-text">{{investmentEffect}}</div>
+    </details>
+  {{/if}}
+
   <footer>
     <span>{{spInvestment}}</span>
     <span>{{rolledAt}}</span>

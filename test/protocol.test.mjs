@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_WEBSOCKET_MESSAGE_LENGTH } from "../scripts/constants.mjs";
+import {
+  MAX_INVESTMENT_EFFECT_LENGTH,
+  MAX_WEBSOCKET_MESSAGE_LENGTH,
+} from "../scripts/constants.mjs";
 import {
   DAMAGE_TYPES,
   FORMULA_LIMITS,
@@ -28,6 +31,10 @@ test("parses a version-one Spiritual Arts roll without changing its data", () =>
   assert.equal(parsed?.eventId, validMessage.eventId);
   assert.equal(parsed?.character.name, "Raan");
   assert.equal(parsed?.roll.techniqueName, "Devour Essence");
+  assert.equal(
+    parsed?.roll.investmentEffect,
+    "Deal necrotic damage.\nThen regain Hit Points from the consumed essence.",
+  );
   assert.equal(parsed?.roll.value, 6);
 });
 
@@ -35,11 +42,33 @@ test("preserves legacy Spirit rolls that omit optional technique metadata", () =
   const legacy = structuredClone(validMessage);
   delete legacy.data.roll.techniqueId;
   delete legacy.data.roll.techniqueName;
+  delete legacy.data.roll.investmentEffect;
 
   const parsed = parseSpiritRollMessage(JSON.stringify(legacy));
   assert.equal(parsed?.type, "spirit_die_roll");
   assert.equal(parsed?.roll.techniqueId, null);
   assert.equal(parsed?.roll.techniqueName, null);
+  assert.equal(parsed?.roll.investmentEffect, null);
+});
+
+test("trims and bounds optional investment effect descriptions", () => {
+  const padded = structuredClone(validMessage);
+  padded.data.roll.investmentEffect = "  Push the target 10 feet.  ";
+  assert.equal(
+    parseSpiritRollMessage(JSON.stringify(padded))?.roll.investmentEffect,
+    "Push the target 10 feet.",
+  );
+
+  for (const investmentEffect of [
+    "",
+    "   ",
+    42,
+    "x".repeat(MAX_INVESTMENT_EFFECT_LENGTH + 1),
+  ]) {
+    const invalid = structuredClone(validMessage);
+    invalid.data.roll.investmentEffect = investmentEffect;
+    assert.equal(parseSpiritRollMessage(JSON.stringify(invalid)), null);
+  }
 });
 
 test("parses valid damage and healing action requests as a discriminated union", () => {

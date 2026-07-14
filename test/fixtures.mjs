@@ -18,6 +18,8 @@ export const validMessage = Object.freeze({
       success: true,
       techniqueId: null,
       techniqueName: "Devour Essence",
+      investmentEffect:
+        "Deal necrotic damage.\nThen regain Hit Points from the consumed essence.",
       timestamp: "2026-07-13T12:00:00.000Z",
     },
   },

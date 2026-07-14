@@ -105,6 +105,38 @@
   color: #9a4439;
 }
 
+.spiritual-arts-roll__investment {
+  margin: 0 10px 10px;
+  border: 1px solid rgb(141 107 64 / 28%);
+  border-radius: 4px;
+  background: rgb(141 107 64 / 6%);
+}
+
+.spiritual-arts-roll__investment summary {
+  padding: 7px 9px;
+  color: var(--sa-ink);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spiritual-arts-roll__investment summary:hover,
+.spiritual-arts-roll__investment summary:focus-visible {
+  background: rgb(141 107 64 / 8%);
+}
+
+.spiritual-arts-roll__investment-text {
+  padding: 8px 9px 9px;
+  border-top: 1px solid rgb(141 107 64 / 20%);
+  color: var(--sa-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .spiritual-arts-roll footer {
   display: flex;
   justify-content: space-between;

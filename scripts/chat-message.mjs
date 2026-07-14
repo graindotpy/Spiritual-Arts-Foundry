@@ -40,6 +40,12 @@ export function buildRollMessageContext(event) {
       localize("SPIRITUAL_ARTS.Chat.TechniqueFallback", {
         sp: event.roll.spInvestment,
       }),
+    investmentEffect: event.roll.investmentEffect,
+    investmentEffectLabel: event.roll.investmentEffect
+      ? localize("SPIRITUAL_ARTS.Chat.InvestmentEffect", {
+          sp: event.roll.spInvestment,
+        })
+      : null,
     dieSize: event.roll.dieSize.toUpperCase(),
     value: event.roll.value,
     spInvestment: localize("SPIRITUAL_ARTS.Chat.SpInvestment", {

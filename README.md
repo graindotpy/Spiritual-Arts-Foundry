@@ -15,7 +15,8 @@ Foundry.
 
 - Only the Foundry user selected in the world setting opens the website
   WebSocket and authors messages. Other Foundry clients remain silent.
-- Existing `spirit_die_roll` events keep their styled chat-card output.
+- Spirit Die cards include the selected SP tier's investment effect in an
+  initially collapsed, expandable section when a technique was selected.
 - Damage and healing `foundry_action_request` events become native Foundry Core
   roll messages. Their flavor identifies the website character, technique,
   action label, and damage or healing type.
@@ -76,6 +77,17 @@ The parser accepts only protocol version 1 and the event types
 strict field allowlist; unknown fields, versions, and event types are ignored.
 Malformed events and failed actions are isolated and do not close the
 WebSocket.
+
+A `spirit_die_roll` may include `roll.investmentEffect`, containing the
+selected SP tier's plain-text effect description. It is trimmed, limited to
+8,000 characters, safely escaped by the chat template, and omitted by legacy
+events or rolls without a valid character-owned technique.
+
+Because the parser uses a strict field allowlist, install and reload this
+updated Foundry module before deploying the website version that sends
+`investmentEffect`. The updated module remains compatible with older website
+events that omit the field; a pre-update module will discard a roll event that
+contains it.
 
 One action request has this wire shape:
 
@@ -214,9 +226,10 @@ Foundry v12 world because Foundry globals are unavailable to Node tests.
    one save-only action with no formula.
 4. Make a Spirit Die roll for that technique and exact SP tier; either a
    success or failure triggers its actions.
-5. Confirm Foundry chat shows the existing Spirit Die card followed by two
-   separate native roll messages plus a plain save-only card authored by the
-   selected bridge user.
+5. Confirm Foundry chat shows the Spirit Die card followed by two separate
+   native roll messages plus a plain save-only card authored by the selected
+   bridge user. Expand the Spirit Die card's investment-effect section and
+   confirm it shows the description from the exact SP tier that was cast.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
    flavor shows the website character, technique, configured/fallback action
    label, and `Necrotic damage` or `Healing`.

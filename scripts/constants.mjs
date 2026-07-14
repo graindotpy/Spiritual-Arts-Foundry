@@ -11,6 +11,7 @@ export const ROLL_TEMPLATE =
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_WEBSOCKET_MESSAGE_LENGTH = 64 * 1024;
+export const MAX_INVESTMENT_EFFECT_LENGTH = 8_000;
 export const MAX_SEEN_EVENT_IDS = 500;
 
 export const RECONNECT = Object.freeze({

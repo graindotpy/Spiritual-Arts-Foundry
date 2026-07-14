@@ -6,6 +6,7 @@
   "SPIRITUAL_ARTS.Chat.Success": "Success",
   "SPIRITUAL_ARTS.Chat.Failure": "Failure",
   "SPIRITUAL_ARTS.Chat.SpInvestment": "{sp} SP invested",
+  "SPIRITUAL_ARTS.Chat.InvestmentEffect": "Investment effect ({sp} SP)",
   "SPIRITUAL_ARTS.Chat.TechniqueFallback": "{sp} SP technique",
   "SPIRITUAL_ARTS.Chat.RolledAt": "Rolled at {time}",
   "SPIRITUAL_ARTS.Chat.DamageRoll": "Damage roll",
