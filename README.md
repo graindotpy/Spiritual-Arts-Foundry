@@ -6,10 +6,9 @@ Foundry chat. It targets Foundry VTT 12 and Dungeons & Dragons Fifth Edition
 4.3.9.
 
 Spirit Die results remain authoritative on the website. Phase one also lets the
-website request tightly constrained damage and healing rolls, plus
-informational saving throws that do not need an attached damage or healing
-roll. Requested dice are rolled by Foundry Core and are authoritative in
-Foundry.
+website request tightly constrained Spiritual Arts attack, damage, and healing
+rolls, plus informational saving throws that do not need attached dice.
+Requested dice are rolled by Foundry Core and are authoritative in Foundry.
 
 ## Behaviour
 
@@ -17,9 +16,14 @@ Foundry.
   WebSocket and authors messages. Other Foundry clients remain silent.
 - Spirit Die cards include the selected SP tier's investment effect in an
   initially collapsed, expandable section when a technique was selected.
-- Damage and healing `foundry_action_request` events become native Foundry Core
-  roll messages. Their flavor identifies the website character, technique,
-  action label, and damage or healing type.
+- Attack, damage, and healing `foundry_action_request` events become native
+  Foundry Core roll messages. Attack formulas are derived from the character's
+  Spiritual Arts attack modifier instead of accepting a client-supplied
+  formula. Flavor identifies the website character, technique, action label,
+  and damage or healing type where relevant.
+- An attack whose modifier is unavailable becomes a normal non-roll ChatMessage
+  card stating that the modifier is unavailable, rather than rolling with an
+  incorrect bonus.
 - A save-only request becomes a normal non-roll ChatMessage card. It shows the
   informational DC and target ability and can carry the same optional measured
   template control without constructing or evaluating a Foundry `Roll`.
@@ -28,8 +32,8 @@ Foundry.
   that enters Foundry's standard measured-template preview and placement
   workflow for the clicking user.
 - No Foundry Actor is selected or changed. There is no automatic damage,
-  healing, targeting, attack roll, saving-throw roll, condition, or active
-  effect. Placed templates are plain scene documents with no mechanical logic.
+  healing, targeting, saving-throw roll, condition, or active effect. Placed
+  templates are plain scene documents with no mechanical logic.
 - Duplicate event IDs are suppressed with a bounded in-memory set, existing
   ChatMessage flags, and deterministic 16-character document IDs created with
   `keepId`.
@@ -84,10 +88,10 @@ selected SP tier's plain-text effect description. It is trimmed, limited to
 events or rolls without a valid character-owned technique.
 
 Because the parser uses a strict field allowlist, install and reload this
-updated Foundry module before deploying the website version that sends
-`investmentEffect`. The updated module remains compatible with older website
-events that omit the field; a pre-update module will discard a roll event that
-contains it.
+updated Foundry module before deploying website versions that send newly added
+fields or action kinds. The updated module remains compatible with older
+website events; a pre-update module will discard events containing
+`investmentEffect` or `roll_attack` data it does not recognise.
 
 One action request has this wire shape:
 
@@ -156,6 +160,24 @@ optional, and `formula` and `damageType` are rejected. Consequently every
 accepted action specifies dice, a saving throw, or both; a template by itself
 is not an action.
 
+A Spiritual Arts attack uses this strict action shape:
+
+```json
+{
+  "id": "e419a6d0-b9b9-4c60-ab9e-a07668cf2119",
+  "kind": "roll_attack",
+  "label": "Seeking strike"
+}
+```
+
+For `roll_attack`, only `id`, `kind`, and the optional `label` are accepted.
+`formula`, `damageType`, `savingThrow`, and `template` are rejected. Its
+character must contain `spiritualArtsAttackModifier`, either an integer from
+-3 to 16 or `null` when the website cannot derive it. That field is rejected
+on every other action kind. Foundry constructs `1d20 + N`, `1d20 - N`, or
+`1d20` for a positive, negative, or zero modifier respectively. A `null`
+modifier produces an informational non-roll card.
+
 `spiritualArtsDc` is optional for rolling-deployment compatibility. When
 present it is an integer from 1 to 100, or `null` when unavailable; omission is
 also displayed as unavailable. A save can target `str`, `dex`, `con`, `int`,
@@ -178,15 +200,17 @@ permission; right-click cancels placement.
 
 The action ChatMessage stores these module flags: `eventId`,
 `protocolVersion`, `sourceRollEventId`, `actionId`, `actionKind`, and (for
-damage) `damageType`. When configured, it also stores `spiritualArtsDc`,
-`savingThrow`, and `template` so every client can render and execute its local
-chat control.
+damage) `damageType`. Attack messages also store
+`spiritualArtsAttackModifier`, including `null`. When configured, messages
+also store `spiritualArtsDc`, `savingThrow`, and `template` so every client can
+render and execute its local chat control.
 
 ## Formula safety
 
 For damage and healing actions, the module independently enforces the phase-one
-grammar before also calling Foundry Core's `Roll.validate`. Save-only actions
-do not call the Roll API:
+grammar before also calling Foundry Core's `Roll.validate`. Attack formulas are
+constructed from the validated modifier and pass through the same Foundry
+validator. Save-only and unavailable-attack actions do not call the Roll API:
 
 - A formula is at most 200 characters before trimming and at most 50 terms.
 - A term is an unsigned integer or `NdM` dice term. Terms may be joined only by
@@ -211,7 +235,7 @@ unchanged Spirit Die renderer.
 npm test
 ```
 
-Final roll and save-only ChatMessage rendering must also be checked in a
+Final roll and informational ChatMessage rendering must also be checked in a
 Foundry v12 world because Foundry globals are unavailable to Node tests.
 
 ## First Foundry v12 smoke test
@@ -222,27 +246,30 @@ Foundry v12 world because Foundry globals are unavailable to Node tests.
    browser developer console and confirm the WebSocket connects without module
    errors. A different logged-in Foundry user should remain inactive.
 3. On the website, use a character-owned technique whose selected SP tier has
-   one damage action (`2d8 + 4`, `necrotic`), one healing action (`1d6`), and
-   one save-only action with no formula.
+   one attack action, one damage action (`2d8 + 4`, `necrotic`), one healing
+   action (`1d6`), and one save-only action with no formula.
 4. Make a Spirit Die roll for that technique and exact SP tier; either a
    success or failure triggers its actions.
-5. Confirm Foundry chat shows the Spirit Die card followed by two separate
+5. Confirm Foundry chat shows the Spirit Die card followed by three separate
    native roll messages plus a plain save-only card authored by the selected
    bridge user. Expand the Spirit Die card's investment-effect section and
    confirm it shows the description from the exact SP tier that was cast.
 6. Expand each native roll. Confirm its formula and dice tooltip work, and its
    flavor shows the website character, technique, configured/fallback action
-   label, and `Necrotic damage` or `Healing`.
+   label, with `Spiritual Arts attack`, `Necrotic damage`, or `Healing` as the
+   relevant fallback/type text.
 7. Configure a Dexterity save and 20-foot circle on either roll. Confirm the
    card displays the character's Spiritual Arts DC and a measured-template
    button. Click it as a permitted user, place the circle, and confirm it is a
    plain 20-foot-radius scene template. Right-click should cancel a preview.
    Confirm the save-only card displays its configured ability and optional
    template in the same way, but contains no dice result or tooltip.
-8. Make a failed Spirit Die roll for the same tier and confirm the configured
-   damage/healing and save-only actions and controls still follow the failure
-   card.
-9. Sign the bridge user out, make another website roll, then sign back in.
+8. Repeat the attack with an unavailable website modifier. Confirm Foundry
+   creates a non-roll card saying `Attack modifier unavailable` and does not
+   show a dice result.
+9. Make a failed Spirit Die roll for the same tier and confirm all configured
+   actions and controls still follow the failure card.
+10. Sign the bridge user out, make another website roll, then sign back in.
    Confirm the missed events are not replayed.
 
 ## Delivery and security limitations

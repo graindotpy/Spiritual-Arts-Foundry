@@ -123,6 +123,7 @@ function measuredTemplateButtonHtml(event) {
 export function buildActionFlavor(event) {
   const isDamage = event.action.kind === "roll_damage";
   const isHealing = event.action.kind === "roll_healing";
+  const isAttack = event.action.kind === "roll_attack";
   const actionLabel =
     event.action.label ??
     localize(
@@ -130,7 +131,9 @@ export function buildActionFlavor(event) {
         ? "SPIRITUAL_ARTS.Chat.DamageRoll"
         : isHealing
           ? "SPIRITUAL_ARTS.Chat.HealingRoll"
-          : "SPIRITUAL_ARTS.Chat.SavingThrowAction",
+          : isAttack
+            ? "SPIRITUAL_ARTS.Chat.AttackRoll"
+            : "SPIRITUAL_ARTS.Chat.SavingThrowAction",
     );
   const rollType = isDamage
     ? localize("SPIRITUAL_ARTS.Chat.DamageType", {
@@ -138,6 +141,14 @@ export function buildActionFlavor(event) {
       })
     : isHealing
       ? localize("SPIRITUAL_ARTS.Chat.Healing")
+      : isAttack &&
+          (event.character.spiritualArtsAttackModifier === null ||
+            event.character.spiritualArtsAttackModifier === undefined)
+        ? localize("SPIRITUAL_ARTS.Chat.AttackModifierUnavailable")
+      : null;
+  const attackType =
+    isAttack && event.action.label
+      ? localize("SPIRITUAL_ARTS.Chat.AttackRoll")
       : null;
   const savingThrow = savingThrowHtml(event);
   const measuredTemplateButton = measuredTemplateButtonHtml(event);
@@ -146,6 +157,7 @@ export function buildActionFlavor(event) {
     '<div class="spiritual-arts-action-flavor">',
     `<strong>${escapeHtml(actionLabel)}</strong>`,
     `<span>${escapeHtml(event.character.name)} &middot; ${escapeHtml(event.technique.name)}</span>`,
+    attackType === null ? "" : `<span>${escapeHtml(attackType)}</span>`,
     rollType === null ? "" : `<span>${escapeHtml(rollType)}</span>`,
     savingThrow || measuredTemplateButton
       ? `<div class="spiritual-arts-action-controls">${savingThrow}${measuredTemplateButton}</div>`
@@ -192,6 +204,12 @@ function actionMessageFlags(event, existingFlags = {}) {
       ...(event.action.kind === "roll_damage"
         ? { damageType: event.action.damageType }
         : {}),
+      ...(event.action.kind === "roll_attack"
+        ? {
+            spiritualArtsAttackModifier:
+              event.character.spiritualArtsAttackModifier,
+          }
+        : {}),
       ...(event.action.savingThrow
         ? {
             spiritualArtsDc: event.character.spiritualArtsDc,
@@ -224,13 +242,54 @@ export async function createSavingThrowChatMessage(event) {
   return created;
 }
 
+/** Create an informational card when the website could not derive an attack modifier. */
+export async function createUnavailableAttackChatMessage(event) {
+  if (
+    event.action.kind !== "roll_attack" ||
+    (event.character.spiritualArtsAttackModifier !== null &&
+      event.character.spiritualArtsAttackModifier !== undefined)
+  ) {
+    throw new Error("Rejected invalid unavailable attack action");
+  }
+
+  const created = await ChatMessage.create(
+    {
+      _id: chatMessageIdForEvent(event.eventId),
+      author: game.user.id,
+      speaker: { alias: game.user.name },
+      flavor: localize("SPIRITUAL_ARTS.Chat.Source"),
+      content: buildActionFlavor(event),
+      flags: actionMessageFlags(event),
+    },
+    { keepId: true },
+  );
+  if (!created) {
+    throw new Error("Foundry did not create the unavailable attack message");
+  }
+  return created;
+}
+
+function actionRollFormula(event) {
+  if (event.action.kind !== "roll_attack") {
+    return parseSafeRollFormula(event.action.formula);
+  }
+
+  const modifier = event.character.spiritualArtsAttackModifier;
+  if (!Number.isInteger(modifier) || modifier < -3 || modifier > 16) {
+    return null;
+  }
+  if (modifier > 0) return `1d20 + ${modifier}`;
+  if (modifier < 0) return `1d20 - ${Math.abs(modifier)}`;
+  return "1d20";
+}
+
 /**
  * Execute one independently validated website request through Foundry Core.
  * The narrow grammar check is repeated here at the execution boundary, followed
  * by Foundry's own Roll validator before any Roll instance is constructed.
  */
 export async function createActionRollChatMessage(event) {
-  const formula = parseSafeRollFormula(event.action.formula);
+  const formula = actionRollFormula(event);
   if (formula === null || !Roll.validate(formula)) {
     throw new Error("Rejected invalid Foundry action roll formula");
   }
@@ -270,10 +329,16 @@ export async function createActionRollChatMessage(event) {
   return created;
 }
 
-/** Route each validated action to either the native-roll or save-only boundary. */
+/** Route each validated action to its native-roll or informational boundary. */
 export async function createActionChatMessage(event) {
   if (event.action.kind === "saving_throw") {
     return createSavingThrowChatMessage(event);
+  }
+  if (event.action.kind === "roll_attack") {
+    return event.character.spiritualArtsAttackModifier === null ||
+      event.character.spiritualArtsAttackModifier === undefined
+      ? createUnavailableAttackChatMessage(event)
+      : createActionRollChatMessage(event);
   }
   if (
     event.action.kind === "roll_damage" ||

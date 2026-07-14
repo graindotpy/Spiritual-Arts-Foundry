@@ -85,6 +85,23 @@ export const validSavingThrowActionMessage = Object.freeze({
   },
 });
 
+export const validAttackActionMessage = Object.freeze({
+  ...structuredClone(validDamageActionMessage),
+  eventId: "938f21bd-8c30-43f8-aac4-8ba97e6cfd19",
+  data: {
+    ...structuredClone(validDamageActionMessage.data),
+    character: {
+      ...structuredClone(validMessage.data.character),
+      spiritualArtsAttackModifier: 7,
+    },
+    action: {
+      id: "e419a6d0-b9b9-4c60-ab9e-a07668cf2119",
+      kind: "roll_attack",
+      label: "Seeking strike",
+    },
+  },
+});
+
 export function serializedActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validDamageActionMessage),
@@ -95,6 +112,13 @@ export function serializedActionMessage(update = {}) {
 export function serializedSavingThrowActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validSavingThrowActionMessage),
+    ...update,
+  });
+}
+
+export function serializedAttackActionMessage(update = {}) {
+  return JSON.stringify({
+    ...structuredClone(validAttackActionMessage),
     ...update,
   });
 }

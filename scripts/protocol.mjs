@@ -109,8 +109,17 @@ function parseTimestamp(value) {
     : null;
 }
 
-function parseCharacter(character, { allowSpiritualArtsDc = false } = {}) {
+function parseCharacter(
+  character,
+  {
+    allowSpiritualArtsDc = false,
+    requireSpiritualArtsAttackModifier = false,
+  } = {},
+) {
   const required = ["id", "name", "path", "level", "portraitUrl"];
+  if (requireSpiritualArtsAttackModifier) {
+    required.push("spiritualArtsAttackModifier");
+  }
   const optional = allowSpiritualArtsDc ? ["spiritualArtsDc"] : [];
   if (!hasExactKeys(character, required, optional)) {
     return null;
@@ -145,7 +154,12 @@ function parseCharacter(character, { allowSpiritualArtsDc = false } = {}) {
       character.spiritualArtsDc !== null &&
       (!Number.isInteger(character.spiritualArtsDc) ||
         character.spiritualArtsDc < 1 ||
-        character.spiritualArtsDc > 100))
+        character.spiritualArtsDc > 100)) ||
+    (requireSpiritualArtsAttackModifier &&
+      character.spiritualArtsAttackModifier !== null &&
+      (!Number.isInteger(character.spiritualArtsAttackModifier) ||
+        character.spiritualArtsAttackModifier < -3 ||
+        character.spiritualArtsAttackModifier > 16))
   ) {
     return null;
   }
@@ -158,6 +172,9 @@ function parseCharacter(character, { allowSpiritualArtsDc = false } = {}) {
     portraitUrl,
     ...(allowSpiritualArtsDc
       ? { spiritualArtsDc: character.spiritualArtsDc ?? null }
+      : {}),
+    ...(requireSpiritualArtsAttackModifier
+      ? { spiritualArtsAttackModifier: character.spiritualArtsAttackModifier }
       : {}),
   };
 }
@@ -352,16 +369,17 @@ function parseAction(action) {
   if (!isRecord(action)) return null;
 
   const required = ["id", "kind"];
-  const optional = ["label", "template"];
+  const optional = ["label"];
   if (action.kind === "roll_damage") {
     required.push("formula", "damageType");
-    optional.push("savingThrow");
+    optional.push("savingThrow", "template");
   } else if (action.kind === "roll_healing") {
     required.push("formula");
-    optional.push("savingThrow");
+    optional.push("savingThrow", "template");
   } else if (action.kind === "saving_throw") {
     required.push("savingThrow");
-  } else {
+    optional.push("template");
+  } else if (action.kind !== "roll_attack") {
     return null;
   }
 
@@ -395,7 +413,7 @@ function parseAction(action) {
     ...(template === undefined ? {} : { template }),
   };
 
-  if (action.kind === "saving_throw") {
+  if (action.kind === "saving_throw" || action.kind === "roll_attack") {
     return {
       id: action.id,
       kind: action.kind,
@@ -437,10 +455,11 @@ function parseFoundryActionData(data) {
   }
 
   const requestedAt = parseTimestamp(data.requestedAt);
+  const action = parseAction(data.action);
   const character = parseCharacter(data.character, {
     allowSpiritualArtsDc: true,
+    requireSpiritualArtsAttackModifier: action?.kind === "roll_attack",
   });
-  const action = parseAction(data.action);
   const techniqueName = isRecord(data.technique)
     ? boundedString(data.technique.name, { min: 1, max: 255, trim: true })
     : null;

@@ -14,10 +14,12 @@ import {
 } from "../scripts/protocol.mjs";
 import {
   serializedActionMessage,
+  serializedAttackActionMessage,
   serializedLegacyActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
   validDamageActionMessage,
+  validAttackActionMessage,
   validEnhancedDamageActionMessage,
   validMessage,
   validSavingThrowActionMessage,
@@ -126,6 +128,59 @@ test("parses a save-only action without a formula or damage type", () => {
       savingThrow: { ability: "str" },
     },
   );
+});
+
+test("parses strict Spiritual Arts attack actions and their derived modifiers", () => {
+  const attack = parseFoundryActionMessage(serializedAttackActionMessage());
+
+  assert.equal(attack?.action.kind, "roll_attack");
+  assert.equal(attack?.action.label, "Seeking strike");
+  assert.equal(attack?.character.spiritualArtsAttackModifier, 7);
+  assert.equal(Object.hasOwn(attack.action, "formula"), false);
+  assert.equal(Object.hasOwn(attack.action, "damageType"), false);
+
+  for (const modifier of [-3, 0, 16, null]) {
+    const message = structuredClone(validAttackActionMessage);
+    message.data.character.spiritualArtsAttackModifier = modifier;
+    assert.equal(
+      parseFoundryActionMessage(JSON.stringify(message))?.character
+        .spiritualArtsAttackModifier,
+      modifier,
+    );
+  }
+});
+
+test("rejects misplaced, missing, malformed, or mechanically enhanced attack actions", () => {
+  const cases = [];
+
+  const missingModifier = structuredClone(validAttackActionMessage);
+  delete missingModifier.data.character.spiritualArtsAttackModifier;
+  cases.push(missingModifier);
+
+  for (const modifier of [-4, 17, 7.5, "7"]) {
+    const invalidModifier = structuredClone(validAttackActionMessage);
+    invalidModifier.data.character.spiritualArtsAttackModifier = modifier;
+    cases.push(invalidModifier);
+  }
+
+  const misplacedModifier = structuredClone(validDamageActionMessage);
+  misplacedModifier.data.character.spiritualArtsAttackModifier = 7;
+  cases.push(misplacedModifier);
+
+  for (const [field, value] of [
+    ["formula", "1d20 + 7"],
+    ["damageType", "force"],
+    ["savingThrow", { ability: "dex" }],
+    ["template", { type: "circle", distance: 20 }],
+  ]) {
+    const enhancedAttack = structuredClone(validAttackActionMessage);
+    enhancedAttack.data.action[field] = value;
+    cases.push(enhancedAttack);
+  }
+
+  for (const message of cases) {
+    assert.equal(parseFoundryActionMessage(JSON.stringify(message)), null);
+  }
 });
 
 test("parses bounded saving throws and all measured template shapes", () => {

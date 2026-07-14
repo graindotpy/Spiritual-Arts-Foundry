@@ -5,6 +5,7 @@ import { MODULE_ID } from "../scripts/constants.mjs";
 import { parseFoundryActionMessage } from "../scripts/protocol.mjs";
 import {
   serializedActionMessage,
+  serializedAttackActionMessage,
   serializedSavingThrowActionMessage,
 } from "./fixtures.mjs";
 
@@ -84,6 +85,27 @@ test("routes save-only actions directly to ChatMessage creation", async () => {
   assert.equal(
     game.messages[0].getFlag(MODULE_ID, "actionKind"),
     "saving_throw",
+  );
+});
+
+test("routes Spiritual Arts attacks through the native Roll boundary", async () => {
+  installGame();
+  const calls = installRollBoundary();
+  const event = parseFoundryActionMessage(serializedAttackActionMessage());
+  const bridge = new SpiritualArtsBridge();
+
+  bridge.connection.onEvent(event);
+  await bridge.queue;
+
+  assert.deepEqual(calls, { validate: 1, evaluate: 1, create: 1 });
+  assert.equal(bridge.seen.has(event.eventId), true);
+  assert.equal(
+    game.messages[0].getFlag(MODULE_ID, "actionKind"),
+    "roll_attack",
+  );
+  assert.equal(
+    game.messages[0].getFlag(MODULE_ID, "spiritualArtsAttackModifier"),
+    7,
   );
 });
 

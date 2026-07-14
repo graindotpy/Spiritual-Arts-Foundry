@@ -22,6 +22,7 @@ import {
 import {
   serializedActionMessage,
   serializedMessage,
+  validAttackActionMessage,
   validEnhancedDamageActionMessage,
   validSavingThrowActionMessage,
 } from "./fixtures.mjs";
@@ -245,6 +246,123 @@ test("creates a save-only action card without using Foundry's Roll API", async (
     spiritualArtsDc: 16,
     savingThrow: { ability: "str" },
     template: { type: "cone", distance: 15, angle: 90 },
+  });
+  assert.deepEqual(created.options, { keepId: true });
+});
+
+test("derives and evaluates Spiritual Arts attacks as native Foundry rolls", async () => {
+  installGame();
+
+  const labeledEvent = parseFoundryActionMessage(
+    JSON.stringify(validAttackActionMessage),
+  );
+  const labeledFlavor = buildActionFlavor(labeledEvent);
+  assert.match(labeledFlavor, /Seeking strike/);
+  assert.equal(labeledFlavor.match(/AttackRoll/g)?.length, 1);
+
+  for (const [modifier, expectedFormula] of [
+    [7, "1d20 + 7"],
+    [0, "1d20"],
+    [-3, "1d20 - 3"],
+  ]) {
+    const actionMessage = structuredClone(validAttackActionMessage);
+    actionMessage.data.character.spiritualArtsAttackModifier = modifier;
+    delete actionMessage.data.action.label;
+    const event = parseFoundryActionMessage(JSON.stringify(actionMessage));
+    const calls = [];
+
+    globalThis.Roll = class FakeAttackRoll {
+      static validate(formula) {
+        calls.push({ boundary: "validate", formula });
+        return true;
+      }
+
+      constructor(formula, data) {
+        calls.push({ boundary: "construct", formula, data });
+      }
+
+      async evaluate(options) {
+        calls.push({ boundary: "evaluate", options });
+        return this;
+      }
+
+      async toMessage(data, options) {
+        calls.push({ boundary: "toMessage", data, options });
+        return { rolls: ["native-attack"] };
+      }
+    };
+    globalThis.ChatMessage = {
+      create: async (data, options) => {
+        calls.push({ boundary: "create", data, options });
+        return { data, options };
+      },
+    };
+
+    const created = await createActionChatMessage(event);
+
+    assert.deepEqual(
+      calls.map((call) => call.boundary),
+      ["validate", "construct", "evaluate", "toMessage", "create"],
+    );
+    assert.equal(calls[0].formula, expectedFormula);
+    assert.equal(calls[1].formula, expectedFormula);
+    assert.deepEqual(calls[1].data, {});
+    assert.match(created.data.flavor, /AttackRoll/);
+    assert.equal(created.data.flavor.match(/AttackRoll/g)?.length, 1);
+    assert.deepEqual(created.data.rolls, ["native-attack"]);
+    assert.deepEqual(created.data.flags["spiritual-arts-foundry"], {
+      eventId: event.eventId,
+      protocolVersion: 1,
+      sourceRollEventId: event.sourceRollEventId,
+      actionId: event.action.id,
+      actionKind: "roll_attack",
+      spiritualArtsAttackModifier: modifier,
+    });
+  }
+});
+
+test("creates an informational attack card when its modifier is unavailable", async () => {
+  installGame();
+  const actionMessage = structuredClone(validAttackActionMessage);
+  actionMessage.data.character.spiritualArtsAttackModifier = null;
+  delete actionMessage.data.action.label;
+  const event = parseFoundryActionMessage(JSON.stringify(actionMessage));
+  const calls = [];
+
+  globalThis.Roll = class UnexpectedRoll {
+    static validate() {
+      calls.push("validate");
+      return true;
+    }
+
+    constructor() {
+      calls.push("construct");
+    }
+  };
+  globalThis.ChatMessage = {
+    create: async (data, options) => {
+      calls.push("create");
+      return { data, options };
+    },
+  };
+
+  const created = await createActionChatMessage(event);
+
+  assert.deepEqual(calls, ["create"]);
+  assert.equal(created.data._id, chatMessageIdForEvent(event.eventId));
+  assert.equal(created.data.author, "bridge-user");
+  assert.deepEqual(created.data.speaker, { alias: "Bridge User" });
+  assert.equal(created.data.flavor, "SPIRITUAL_ARTS.Chat.Source");
+  assert.equal(Object.hasOwn(created.data, "rolls"), false);
+  assert.match(created.data.content, /AttackRoll/);
+  assert.match(created.data.content, /AttackModifierUnavailable/);
+  assert.deepEqual(created.data.flags["spiritual-arts-foundry"], {
+    eventId: event.eventId,
+    protocolVersion: 1,
+    sourceRollEventId: event.sourceRollEventId,
+    actionId: event.action.id,
+    actionKind: "roll_attack",
+    spiritualArtsAttackModifier: null,
   });
   assert.deepEqual(created.options, { keepId: true });
 });

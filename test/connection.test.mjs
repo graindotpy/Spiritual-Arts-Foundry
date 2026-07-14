@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { RollBridgeConnection } from "../scripts/connection.mjs";
 import {
   serializedActionMessage,
+  serializedAttackActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
 } from "./fixtures.mjs";
@@ -54,14 +55,17 @@ test("delivers only valid live messages while connected", () => {
   socket.emitMessage(serializedMessage());
   socket.emitMessage(serializedActionMessage());
   socket.emitMessage(serializedSavingThrowActionMessage());
+  socket.emitMessage(serializedAttackActionMessage());
 
-  assert.equal(events.length, 3);
+  assert.equal(events.length, 4);
   assert.equal(events[0].type, "spirit_die_roll");
   assert.equal(events[0].character.name, "Raan");
   assert.equal(events[1].type, "foundry_action_request");
   assert.equal(events[1].action.kind, "roll_damage");
   assert.equal(events[2].type, "foundry_action_request");
   assert.equal(events[2].action.kind, "saving_throw");
+  assert.equal(events[3].type, "foundry_action_request");
+  assert.equal(events[3].action.kind, "roll_attack");
 
   connection.stop();
   assert.equal(socket.closed, true);
