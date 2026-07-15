@@ -5,11 +5,12 @@ A Foundry VTT module that receives live events from
 Foundry chat. It targets Foundry VTT 12 and Dungeons & Dragons Fifth Edition
 4.3.9.
 
-Spirit Die results remain authoritative on the website. Phase one also lets the
-website request tightly constrained Spiritual Arts attack, damage, and healing
-rolls, plus informational saving throws and measured templates that do not need
-attached dice. Requested dice are rolled by Foundry Core and are authoritative
-in Foundry.
+Spirit Die results remain authoritative on the website. The website can also
+request tightly constrained Spiritual Arts attack, damage, and healing rolls,
+plus informational saving throws and measured templates that do not need
+attached dice. Requests may come from a technique's selected SP tier or from a
+Spiritual Instrument action used directly on the character sheet. Requested
+dice are rolled by Foundry Core and are authoritative in Foundry.
 
 ## Behaviour
 
@@ -22,6 +23,9 @@ in Foundry.
   Spiritual Arts attack modifier instead of accepting a client-supplied
   formula. Flavor identifies the website character, technique, action label,
   and damage or healing type where relevant.
+- Direct Spiritual Instrument requests use the same validated Foundry action
+  boundaries. Their flavor identifies the website character, instrument, and
+  instrument action instead of a technique and SP tier.
 - An attack whose modifier is unavailable becomes a normal non-roll ChatMessage
   card stating that the modifier is unavailable, rather than rolling with an
   incorrect bonus.
@@ -95,10 +99,10 @@ Because the parser uses a strict field allowlist, install and reload this
 updated Foundry module before deploying website versions that send newly added
 fields or action kinds. The updated module remains compatible with older
 website events; a pre-update module will discard events containing
-`investmentEffect`, `roll_attack`, or `place_template` data it does not
-recognise.
+`investmentEffect`, direct instrument provenance, `roll_attack`, or
+`place_template` data it does not recognise.
 
-One action request has this wire shape:
+A technique action request has this wire shape:
 
 ```json
 {
@@ -134,11 +138,56 @@ One action request has this wire shape:
 }
 ```
 
-`eventId`, `sourceRollEventId`, technique IDs, and action IDs must be UUIDs.
+A directly used Spiritual Instrument action keeps the same event type and
+action schema, but uses a disjoint, strict provenance shape:
+
+```json
+{
+  "protocolVersion": 1,
+  "eventId": "1772e083-d3e5-48bb-a7e8-e6c804c333e0",
+  "type": "foundry_action_request",
+  "data": {
+    "requestedAt": "2026-07-15T18:30:00.100Z",
+    "sourceUseId": "b479a5a5-4662-4ee9-a9f5-2537fb3ea4a3",
+    "character": {
+      "id": "character-1",
+      "name": "Raan",
+      "path": "Path of Gluttony",
+      "level": 8,
+      "portraitUrl": null,
+      "spiritualArtsDc": 16
+    },
+    "instrument": {
+      "id": "592f6770-68d4-480b-9f96-852abcf6e0f2",
+      "name": "Singing Bowl"
+    },
+    "instrumentAction": {
+      "id": "ab3214ae-44d1-49ff-bff6-4bf6b8898f1d",
+      "name": "Resonant Blast"
+    },
+    "action": {
+      "id": "108f9dd1-c3e9-41a0-a1b4-2dc61f7b8b46",
+      "kind": "roll_damage",
+      "formula": "2d8 + 4",
+      "damageType": "thunder",
+      "label": "Resonant damage"
+    }
+  }
+}
+```
+
+All configured Foundry actions emitted for one click share `sourceUseId`.
+Instrument requests must omit `sourceRollEventId`, `technique`, and
+`spInvestment`; technique requests must omit the instrument provenance fields.
+The parser rejects mixed or partial variants.
+
+`eventId`, `sourceRollEventId`, `sourceUseId`, technique IDs, instrument IDs,
+instrument-action IDs, and Foundry action IDs must be UUIDs.
 `requestedAt` must be a finite UTC ISO timestamp. Character names, paths,
-technique names, and optional non-empty labels are trimmed and limited to 255
-characters. Character levels are 1–20 and SP investment is 1–100. Labels are
-omitted when unused. Damage actions require exactly one of these types:
+technique names, instrument names, instrument-action names, and optional
+non-empty labels are trimmed and limited to 255 characters. Character levels
+are 1–20 and technique SP investment is 1–100. Labels are omitted when unused.
+Damage actions require exactly one of these types:
 
 ```text
 acid, bludgeoning, cold, fire, force, lightning, necrotic, piercing,
@@ -218,9 +267,11 @@ length and is converted to Foundry's diagonal representation. Placing a
 template requires an active scene and the clicking user's `TEMPLATE_CREATE`
 permission; right-click cancels placement.
 
-The action ChatMessage stores these module flags: `eventId`,
-`protocolVersion`, `sourceRollEventId`, `actionId`, `actionKind`, and (for
-damage) `damageType`. Attack messages also store
+Every action ChatMessage stores `eventId`, `protocolVersion`, `actionId`, and
+`actionKind`. Technique actions also store `sourceRollEventId`. Instrument
+actions instead store `sourceUseId`, `instrumentId`, `instrumentName`,
+`instrumentActionId`, and `instrumentActionName`. Damage messages store
+`damageType`, and attack messages also store
 `spiritualArtsAttackModifier`, including `null`. When configured, messages
 also store `spiritualArtsDc`, `savingThrow`, and `template` so every client can
 render and execute its local chat control.
@@ -295,7 +346,11 @@ Foundry v12 world because Foundry globals are unavailable to Node tests.
    show a dice result.
 10. Make a failed Spirit Die roll for the same tier and confirm all configured
    actions and controls still follow the failure card.
-11. Sign the bridge user out, make another website roll, then sign back in.
+11. Give the same character a Spiritual Instrument action with equivalent
+    Foundry mechanics. Use it directly on the character sheet and confirm the
+    same roll, save, attack, and template behavior, with the instrument and
+    instrument-action names shown instead of a technique name.
+12. Sign the bridge user out, make another website roll, then sign back in.
    Confirm the missed events are not replayed.
 
 ## Delivery and security limitations

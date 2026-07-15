@@ -8,6 +8,7 @@ import {
   serializedAttackActionMessage,
   serializedSavingThrowActionMessage,
   serializedTemplateActionMessage,
+  validInstrumentActionMessage,
 } from "./fixtures.mjs";
 
 function installGame({ currentUserId = "bridge-user" } = {}) {
@@ -135,6 +136,86 @@ test("routes Spiritual Arts attacks through the native Roll boundary", async () 
     game.messages[0].getFlag(MODULE_ID, "spiritualArtsAttackModifier"),
     7,
   );
+});
+
+test("routes every instrument mechanic through the existing Foundry action boundaries", async () => {
+  const variants = [
+    {
+      action: structuredClone(validInstrumentActionMessage.data.action),
+      rollCalls: 1,
+    },
+    {
+      action: {
+        id: "d109bc25-197a-4743-8eee-c72fa7868a50",
+        kind: "roll_healing",
+        formula: "1d6 + 2",
+      },
+      rollCalls: 1,
+    },
+    {
+      action: {
+        id: "67fd49b7-babb-4e97-bd22-7c3f319950c8",
+        kind: "saving_throw",
+        savingThrow: { ability: "con" },
+      },
+      rollCalls: 0,
+    },
+    {
+      action: {
+        id: "6ed5fc77-d0f2-4b45-91fd-f279791e7956",
+        kind: "place_template",
+        template: { type: "cone", distance: 15, angle: 90 },
+      },
+      rollCalls: 0,
+    },
+    {
+      action: {
+        id: "7906191b-3d0d-4e5e-bb6c-47eca84769a6",
+        kind: "roll_attack",
+      },
+      attackModifier: 6,
+      rollCalls: 1,
+    },
+  ];
+
+  for (const variant of variants) {
+    installGame();
+    const calls = installRollBoundary();
+    const message = structuredClone(validInstrumentActionMessage);
+    message.data.action = variant.action;
+    if (variant.attackModifier !== undefined) {
+      message.data.character.spiritualArtsAttackModifier =
+        variant.attackModifier;
+    }
+    const event = parseFoundryActionMessage(JSON.stringify(message));
+    const bridge = new SpiritualArtsBridge();
+
+    bridge.connection.onEvent(event);
+    await bridge.queue;
+
+    assert.deepEqual(calls, {
+      validate: variant.rollCalls,
+      evaluate: variant.rollCalls,
+      create: 1,
+    });
+    assert.equal(bridge.seen.has(event.eventId), true);
+    assert.equal(
+      game.messages[0].getFlag(MODULE_ID, "sourceUseId"),
+      validInstrumentActionMessage.data.sourceUseId,
+    );
+    assert.equal(
+      game.messages[0].getFlag(MODULE_ID, "instrumentName"),
+      "Singing Bowl",
+    );
+    assert.equal(
+      game.messages[0].getFlag(MODULE_ID, "instrumentActionName"),
+      "Resonant Blast",
+    );
+    assert.equal(
+      game.messages[0].getFlag(MODULE_ID, "actionKind"),
+      variant.action.kind,
+    );
+  }
 });
 
 test("suppresses in-memory duplicates and events found in message flags", async () => {

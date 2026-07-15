@@ -15,6 +15,7 @@ import {
 import {
   serializedActionMessage,
   serializedAttackActionMessage,
+  serializedInstrumentActionMessage,
   serializedLegacyActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
@@ -22,6 +23,7 @@ import {
   validDamageActionMessage,
   validAttackActionMessage,
   validEnhancedDamageActionMessage,
+  validInstrumentActionMessage,
   validMessage,
   validSavingThrowActionMessage,
   validTemplateActionMessage,
@@ -100,6 +102,96 @@ test("parses valid damage and healing action requests as a discriminated union",
       parseFoundryActionMessage(JSON.stringify(message))?.action.damageType,
       damageType,
     );
+  }
+});
+
+test("parses the strict instrument-action request variant for every Foundry action kind", () => {
+  const damage = parseFoundryActionMessage(serializedInstrumentActionMessage());
+
+  assert.equal(damage?.type, "foundry_action_request");
+  assert.equal(damage?.sourceUseId, validInstrumentActionMessage.data.sourceUseId);
+  assert.deepEqual(damage?.instrument, {
+    id: validInstrumentActionMessage.data.instrument.id,
+    name: "Singing Bowl",
+  });
+  assert.deepEqual(damage?.instrumentAction, {
+    id: validInstrumentActionMessage.data.instrumentAction.id,
+    name: "Resonant Blast",
+  });
+  assert.equal(damage?.action.kind, "roll_damage");
+  assert.equal(Object.hasOwn(damage, "sourceRollEventId"), false);
+  assert.equal(Object.hasOwn(damage, "technique"), false);
+  assert.equal(Object.hasOwn(damage, "spInvestment"), false);
+
+  const variants = [
+    {
+      id: "d109bc25-197a-4743-8eee-c72fa7868a50",
+      kind: "roll_healing",
+      formula: "1d6 + 2",
+    },
+    {
+      id: "67fd49b7-babb-4e97-bd22-7c3f319950c8",
+      kind: "saving_throw",
+      savingThrow: { ability: "con" },
+    },
+    {
+      id: "6ed5fc77-d0f2-4b45-91fd-f279791e7956",
+      kind: "place_template",
+      template: { type: "cone", distance: 15, angle: 90 },
+    },
+  ];
+
+  for (const action of variants) {
+    const message = structuredClone(validInstrumentActionMessage);
+    message.data.action = action;
+    assert.deepEqual(
+      parseFoundryActionMessage(JSON.stringify(message))?.action,
+      action,
+    );
+  }
+
+  const attack = structuredClone(validInstrumentActionMessage);
+  attack.data.character.spiritualArtsAttackModifier = 6;
+  attack.data.action = {
+    id: "7906191b-3d0d-4e5e-bb6c-47eca84769a6",
+    kind: "roll_attack",
+  };
+  assert.equal(
+    parseFoundryActionMessage(JSON.stringify(attack))?.character
+      .spiritualArtsAttackModifier,
+    6,
+  );
+});
+
+test("rejects malformed or mixed instrument-action request provenance", () => {
+  const cases = [];
+
+  for (const [path, value] of [
+    [["sourceUseId"], "not-a-uuid"],
+    [["instrument", "id"], "not-a-uuid"],
+    [["instrument", "name"], "   "],
+    [["instrumentAction", "id"], "not-a-uuid"],
+    [["instrumentAction", "name"], "x".repeat(256)],
+  ]) {
+    const message = structuredClone(validInstrumentActionMessage);
+    let target = message.data;
+    for (const key of path.slice(0, -1)) target = target[key];
+    target[path.at(-1)] = value;
+    cases.push(message);
+  }
+
+  const mixedSource = structuredClone(validInstrumentActionMessage);
+  mixedSource.data.technique = structuredClone(
+    validDamageActionMessage.data.technique,
+  );
+  cases.push(mixedSource);
+
+  const missingActionSource = structuredClone(validInstrumentActionMessage);
+  delete missingActionSource.data.instrumentAction;
+  cases.push(missingActionSource);
+
+  for (const message of cases) {
+    assert.equal(parseFoundryActionMessage(JSON.stringify(message)), null);
   }
 });
 

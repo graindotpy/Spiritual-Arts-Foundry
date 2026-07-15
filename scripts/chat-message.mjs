@@ -155,11 +155,18 @@ export function buildActionFlavor(event) {
       : null;
   const savingThrow = savingThrowHtml(event);
   const measuredTemplateButton = measuredTemplateButtonHtml(event);
+  const sourceNames = Object.hasOwn(event, "instrument")
+    ? [
+        event.character.name,
+        event.instrument.name,
+        event.instrumentAction.name,
+      ]
+    : [event.character.name, event.technique.name];
 
   return [
     '<div class="spiritual-arts-action-flavor">',
     `<strong>${escapeHtml(actionLabel)}</strong>`,
-    `<span>${escapeHtml(event.character.name)} &middot; ${escapeHtml(event.technique.name)}</span>`,
+    `<span>${sourceNames.map(escapeHtml).join(" &middot; ")}</span>`,
     attackType === null ? "" : `<span>${escapeHtml(attackType)}</span>`,
     rollType === null ? "" : `<span>${escapeHtml(rollType)}</span>`,
     savingThrow || measuredTemplateButton
@@ -196,12 +203,22 @@ export async function createRollChatMessage(event) {
 }
 
 function actionMessageFlags(event, existingFlags = {}) {
+  const sourceFlags = Object.hasOwn(event, "instrument")
+    ? {
+        sourceUseId: event.sourceUseId,
+        instrumentId: event.instrument.id,
+        instrumentName: event.instrument.name,
+        instrumentActionId: event.instrumentAction.id,
+        instrumentActionName: event.instrumentAction.name,
+      }
+    : { sourceRollEventId: event.sourceRollEventId };
+
   return {
     ...existingFlags,
     [MODULE_ID]: {
       eventId: event.eventId,
       protocolVersion: event.protocolVersion,
-      sourceRollEventId: event.sourceRollEventId,
+      ...sourceFlags,
       actionId: event.action.id,
       actionKind: event.action.kind,
       ...(event.action.kind === "roll_damage"

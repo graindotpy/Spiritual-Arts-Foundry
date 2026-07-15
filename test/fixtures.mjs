@@ -117,6 +117,35 @@ export const validTemplateActionMessage = Object.freeze({
   },
 });
 
+export const validInstrumentActionMessage = Object.freeze({
+  protocolVersion: 1,
+  eventId: "1772e083-d3e5-48bb-a7e8-e6c804c333e0",
+  type: "foundry_action_request",
+  data: {
+    requestedAt: "2026-07-15T18:30:00.100Z",
+    sourceUseId: "b479a5a5-4662-4ee9-a9f5-2537fb3ea4a3",
+    character: {
+      ...structuredClone(validMessage.data.character),
+      spiritualArtsDc: 16,
+    },
+    instrument: {
+      id: "592f6770-68d4-480b-9f96-852abcf6e0f2",
+      name: "Singing Bowl",
+    },
+    instrumentAction: {
+      id: "ab3214ae-44d1-49ff-bff6-4bf6b8898f1d",
+      name: "Resonant Blast",
+    },
+    action: {
+      id: "108f9dd1-c3e9-41a0-a1b4-2dc61f7b8b46",
+      kind: "roll_damage",
+      formula: "2d8 + 4",
+      damageType: "thunder",
+      label: "Resonant damage",
+    },
+  },
+});
+
 export function serializedActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validDamageActionMessage),
@@ -141,6 +170,13 @@ export function serializedAttackActionMessage(update = {}) {
 export function serializedTemplateActionMessage(update = {}) {
   return JSON.stringify({
     ...structuredClone(validTemplateActionMessage),
+    ...update,
+  });
+}
+
+export function serializedInstrumentActionMessage(update = {}) {
+  return JSON.stringify({
+    ...structuredClone(validInstrumentActionMessage),
     ...update,
   });
 }

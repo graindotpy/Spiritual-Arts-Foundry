@@ -24,6 +24,7 @@ import {
   serializedMessage,
   validAttackActionMessage,
   validEnhancedDamageActionMessage,
+  validInstrumentActionMessage,
   validSavingThrowActionMessage,
   validTemplateActionMessage,
 } from "./fixtures.mjs";
@@ -200,6 +201,23 @@ test("evaluates and creates an action as a native Foundry v12 roll message", asy
   assert.match(created.data.flavor, /16/);
   assert.match(created.data.flavor, /place-spiritual-arts-template/);
   assert.equal(buildActionFlavor(event), created.data.flavor);
+});
+
+test("renders escaped instrument and instrument-action provenance in action flavor", () => {
+  installGame();
+  const message = structuredClone(validInstrumentActionMessage);
+  message.data.instrument.name = "Singing <script>Bowl</script>";
+  message.data.instrumentAction.name = "Resonant <b>Blast</b>";
+  const event = parseFoundryActionMessage(JSON.stringify(message));
+
+  const flavor = buildActionFlavor(event);
+
+  assert.match(
+    flavor,
+    /Raan &middot; Singing &lt;script&gt;Bowl&lt;\/script&gt; &middot; Resonant &lt;b&gt;Blast&lt;\/b&gt;/,
+  );
+  assert.doesNotMatch(flavor, /<script>|<b>Blast/);
+  assert.doesNotMatch(flavor, /Devour Essence/);
 });
 
 test("creates a save-only action card without using Foundry's Roll API", async () => {

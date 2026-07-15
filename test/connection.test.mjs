@@ -4,6 +4,7 @@ import { RollBridgeConnection } from "../scripts/connection.mjs";
 import {
   serializedActionMessage,
   serializedAttackActionMessage,
+  serializedInstrumentActionMessage,
   serializedMessage,
   serializedSavingThrowActionMessage,
   serializedTemplateActionMessage,
@@ -58,8 +59,9 @@ test("delivers only valid live messages while connected", () => {
   socket.emitMessage(serializedSavingThrowActionMessage());
   socket.emitMessage(serializedAttackActionMessage());
   socket.emitMessage(serializedTemplateActionMessage());
+  socket.emitMessage(serializedInstrumentActionMessage());
 
-  assert.equal(events.length, 5);
+  assert.equal(events.length, 6);
   assert.equal(events[0].type, "spirit_die_roll");
   assert.equal(events[0].character.name, "Raan");
   assert.equal(events[1].type, "foundry_action_request");
@@ -70,6 +72,10 @@ test("delivers only valid live messages while connected", () => {
   assert.equal(events[3].action.kind, "roll_attack");
   assert.equal(events[4].type, "foundry_action_request");
   assert.equal(events[4].action.kind, "place_template");
+  assert.equal(events[5].type, "foundry_action_request");
+  assert.equal(events[5].instrument.name, "Singing Bowl");
+  assert.equal(events[5].instrumentAction.name, "Resonant Blast");
+  assert.equal(events[5].action.kind, "roll_damage");
 
   connection.stop();
   assert.equal(socket.closed, true);

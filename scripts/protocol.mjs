@@ -446,20 +446,7 @@ function parseAction(action) {
   };
 }
 
-function parseFoundryActionData(data) {
-  if (
-    !hasExactKeys(data, [
-      "requestedAt",
-      "sourceRollEventId",
-      "character",
-      "technique",
-      "spInvestment",
-      "action",
-    ])
-  ) {
-    return null;
-  }
-
+function parseTechniqueActionData(data) {
   const requestedAt = parseTimestamp(data.requestedAt);
   const action = parseAction(data.action);
   const character = parseCharacter(data.character, {
@@ -493,6 +480,82 @@ function parseFoundryActionData(data) {
     spInvestment: data.spInvestment,
     action,
   };
+}
+
+function parseInstrumentActionData(data) {
+  const requestedAt = parseTimestamp(data.requestedAt);
+  const action = parseAction(data.action);
+  const character = parseCharacter(data.character, {
+    allowSpiritualArtsDc: true,
+    requireSpiritualArtsAttackModifier: action?.kind === "roll_attack",
+  });
+  const instrumentName = isRecord(data.instrument)
+    ? boundedString(data.instrument.name, { min: 1, max: 255, trim: true })
+    : null;
+  const instrumentActionName = isRecord(data.instrumentAction)
+    ? boundedString(data.instrumentAction.name, {
+        min: 1,
+        max: 255,
+        trim: true,
+      })
+    : null;
+
+  if (
+    requestedAt === null ||
+    !isUuid(data.sourceUseId) ||
+    character === null ||
+    !hasExactKeys(data.instrument, ["id", "name"]) ||
+    !isUuid(data.instrument.id) ||
+    instrumentName === null ||
+    !hasExactKeys(data.instrumentAction, ["id", "name"]) ||
+    !isUuid(data.instrumentAction.id) ||
+    instrumentActionName === null ||
+    action === null
+  ) {
+    return null;
+  }
+
+  return {
+    requestedAt,
+    sourceUseId: data.sourceUseId,
+    character,
+    instrument: { id: data.instrument.id, name: instrumentName },
+    instrumentAction: {
+      id: data.instrumentAction.id,
+      name: instrumentActionName,
+    },
+    action,
+  };
+}
+
+function parseFoundryActionData(data) {
+  if (
+    hasExactKeys(data, [
+      "requestedAt",
+      "sourceRollEventId",
+      "character",
+      "technique",
+      "spInvestment",
+      "action",
+    ])
+  ) {
+    return parseTechniqueActionData(data);
+  }
+
+  if (
+    hasExactKeys(data, [
+      "requestedAt",
+      "sourceUseId",
+      "character",
+      "instrument",
+      "instrumentAction",
+      "action",
+    ])
+  ) {
+    return parseInstrumentActionData(data);
+  }
+
+  return null;
 }
 
 /**
